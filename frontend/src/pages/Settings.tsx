@@ -794,7 +794,7 @@ export default function Settings() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
-                            ???????
+                            聚合每源最多字符数
                         </label>
                         <input
                             type="number"
@@ -817,9 +817,9 @@ export default function Settings() {
                                     ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
                                     : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300'
                             }`}
-                            title="????? URL ?????????????????????"
+                            title="启用后对聚合结果进行URL去重，避免重复新闻占位"
                         >
-                            ?????{newsDedupeEnabled ? '??' : '??'}
+                            {newsDedupeEnabled ? '去重开启' : '去重关闭'}
                         </button>
                     </div>
                 </div>
