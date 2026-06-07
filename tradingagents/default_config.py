@@ -38,6 +38,26 @@ DEFAULT_CONFIG = {
     "searxng_max_results": int(os.getenv("SEARXNG_MAX_RESULTS", "16")),
     "searxng_min_score": float(os.getenv("SEARXNG_MIN_SCORE", "0.45")),
     "searxng_cache_ttl_seconds": int(os.getenv("SEARXNG_CACHE_TTL_SECONDS", "900")),
+
+    # News provider strategy: fallback keeps current behavior; hybrid supplements
+    # weak primary results; aggregate queries all configured news providers.
+    "news_data_strategy": os.getenv("NEWS_DATA_STRATEGY", "hybrid"),
+    "news_hybrid_min_items": int(os.getenv("NEWS_HYBRID_MIN_ITEMS", "8")),
+    "news_hybrid_min_confidence": float(os.getenv("NEWS_HYBRID_MIN_CONFIDENCE", "0.70")),
+    "news_aggregate_max_items": int(os.getenv("NEWS_AGGREGATE_MAX_ITEMS", "20")),
+    "news_aggregate_max_chars": int(os.getenv("NEWS_AGGREGATE_MAX_CHARS", "20000")),
+    "news_dedupe_enabled": os.getenv("NEWS_DEDUPE_ENABLED", "true").lower() in ("1", "true", "yes", "on"),
+
+    # Tushare Pro structured A-share data source configuration.
+    # User-saved frontend settings override these environment values at runtime.
+    "tushare_enabled": os.getenv("TUSHARE_ENABLED", "false").lower() in ("1", "true", "yes", "on"),
+    "tushare_token": os.getenv("TUSHARE_TOKEN", ""),
+    "tushare_timeout": int(os.getenv("TUSHARE_TIMEOUT", "10")),
+    "tushare_rate_limit_per_minute": int(os.getenv("TUSHARE_RATE_LIMIT_PER_MINUTE", "40")),
+    "tushare_cache_ttl_seconds": int(os.getenv("TUSHARE_CACHE_TTL_SECONDS", "86400")),
+    "tushare_capability_cache_ttl_seconds": int(os.getenv("TUSHARE_CAPABILITY_CACHE_TTL_SECONDS", "86400")),
+    "tushare_capabilities": {},
+    "tushare_last_checked_at": None,
     
     # Data vendor configuration
     "data_vendors": {

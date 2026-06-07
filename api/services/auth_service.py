@@ -251,10 +251,25 @@ def upsert_user_llm_config(
     max_debate_rounds: Optional[int] = None,
     max_risk_discuss_rounds: Optional[int] = None,
     searxng_base_url: Optional[str] = None,
+    news_data_strategy: Optional[str] = None,
+    news_hybrid_min_items: Optional[int] = None,
+    news_hybrid_min_confidence: Optional[float] = None,
+    news_aggregate_max_items: Optional[int] = None,
+    news_aggregate_max_chars: Optional[int] = None,
+    news_dedupe_enabled: Optional[bool] = None,
+    tushare_enabled: Optional[bool] = None,
+    tushare_token: Optional[str] = None,
+    tushare_timeout: Optional[int] = None,
+    tushare_rate_limit_per_minute: Optional[int] = None,
+    tushare_cache_ttl_seconds: Optional[int] = None,
+    tushare_capability_cache_ttl_seconds: Optional[int] = None,
+    tushare_capabilities: Optional[dict] = None,
+    tushare_last_checked_at: Optional[datetime] = None,
     api_key: Optional[str] = None,
     wecom_webhook_url: Optional[str] = None,
     clear_api_key: bool = False,
     clear_wecom_webhook: bool = False,
+    clear_tushare_token: bool = False,
     default_analysts: Optional[list] = None,
 ) -> UserLLMConfigDB:
     row = get_user_llm_config(db, user_id)
@@ -277,11 +292,42 @@ def upsert_user_llm_config(
         row.max_risk_discuss_rounds = max_risk_discuss_rounds
     if searxng_base_url is not None:
         row.searxng_base_url = searxng_base_url or None
+    if news_data_strategy is not None:
+        row.news_data_strategy = news_data_strategy
+    if news_hybrid_min_items is not None:
+        row.news_hybrid_min_items = int(news_hybrid_min_items)
+    if news_hybrid_min_confidence is not None:
+        row.news_hybrid_min_confidence = float(news_hybrid_min_confidence)
+    if news_aggregate_max_items is not None:
+        row.news_aggregate_max_items = int(news_aggregate_max_items)
+    if news_aggregate_max_chars is not None:
+        row.news_aggregate_max_chars = int(news_aggregate_max_chars)
+    if news_dedupe_enabled is not None:
+        row.news_dedupe_enabled = bool(news_dedupe_enabled)
+    if tushare_enabled is not None:
+        row.tushare_enabled = bool(tushare_enabled)
+    if tushare_timeout is not None:
+        row.tushare_timeout = int(tushare_timeout)
+    if tushare_rate_limit_per_minute is not None:
+        row.tushare_rate_limit_per_minute = int(tushare_rate_limit_per_minute)
+    if tushare_cache_ttl_seconds is not None:
+        row.tushare_cache_ttl_seconds = int(tushare_cache_ttl_seconds)
+    if tushare_capability_cache_ttl_seconds is not None:
+        row.tushare_capability_cache_ttl_seconds = int(tushare_capability_cache_ttl_seconds)
+    if tushare_capabilities is not None:
+        row.tushare_capabilities = tushare_capabilities
+    if tushare_last_checked_at is not None:
+        row.tushare_last_checked_at = tushare_last_checked_at
 
     if clear_api_key:
         row.api_key_encrypted = None
     elif api_key:
         row.api_key_encrypted = encrypt_secret(api_key)
+
+    if clear_tushare_token:
+        row.tushare_token_encrypted = None
+    elif tushare_token:
+        row.tushare_token_encrypted = encrypt_secret(tushare_token)
 
     if clear_wecom_webhook:
         row.wecom_webhook_encrypted = None

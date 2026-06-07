@@ -1,4 +1,4 @@
-import type { AnalysisRequest, AnalysisResponse, Announcement, AuthUser, AuthVerifyResponse, JobStatus, AnalysisReport, KlineResponse, LatestAnnouncementResponse, PortfolioImportState, PortfolioOverviewResponse, PortfolioPositionInput, Report, ReportDetail, ReportListResponse, RuntimeConfig, RuntimeConfigUpdate, RuntimeConfigUpdateResponse, RuntimeWarmupRequest, RuntimeWarmupResponse, SearxngTestResponse, WatchlistItem, WatchlistBatchResponse, ScheduledAnalysis, ScheduledBatchTriggerResponse, StockSearchResult, TrackingBoardResponse, UserToken, UserTokenCreateRequest, WecomWarmupRequest, WecomWarmupResponse, FeedbackItem, FeedbackListResponse, FeedbackUnreadResponse } from '@/types'
+import type { AnalysisRequest, AnalysisResponse, Announcement, AuthUser, AuthVerifyResponse, JobStatus, AnalysisReport, KlineResponse, LatestAnnouncementResponse, PortfolioImportState, PortfolioOverviewResponse, PortfolioPositionInput, Report, ReportDetail, ReportListResponse, RuntimeConfig, RuntimeConfigUpdate, RuntimeConfigUpdateResponse, RuntimeWarmupRequest, RuntimeWarmupResponse, SearxngTestResponse, TushareProbeResponse, TushareSettings, TushareSettingsUpdate, TushareTestResponse, WatchlistItem, WatchlistBatchResponse, ScheduledAnalysis, ScheduledBatchTriggerResponse, StockSearchResult, TrackingBoardResponse, UserToken, UserTokenCreateRequest, WecomWarmupRequest, WecomWarmupResponse, FeedbackItem, FeedbackListResponse, FeedbackUnreadResponse } from '@/types'
 
 export function getBaseUrl(): string {
     const envUrl = (import.meta.env.VITE_API_URL as string) || ''
@@ -283,6 +283,30 @@ class ApiService {
         return this.request<SearxngTestResponse>('/v1/config/searxng/test', {
             method: 'POST',
             body: JSON.stringify({ searxng_base_url }),
+        })
+    }
+
+    async getTushareSettings(): Promise<TushareSettings> {
+        return this.request<TushareSettings>('/v1/settings/data-sources/tushare')
+    }
+
+    async updateTushareSettings(updates: TushareSettingsUpdate): Promise<TushareSettings> {
+        return this.request<TushareSettings>('/v1/settings/data-sources/tushare', {
+            method: 'POST',
+            body: JSON.stringify(updates),
+        })
+    }
+
+    async testTushare(token?: string): Promise<TushareTestResponse> {
+        return this.request<TushareTestResponse>('/v1/settings/data-sources/tushare/test', {
+            method: 'POST',
+            body: JSON.stringify({ token }),
+        })
+    }
+
+    async probeTushareCapabilities(): Promise<TushareProbeResponse> {
+        return this.request<TushareProbeResponse>('/v1/settings/data-sources/tushare/probe-capabilities', {
+            method: 'POST',
         })
     }
 

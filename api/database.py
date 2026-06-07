@@ -138,6 +138,34 @@ def _ensure_user_schema() -> None:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN default_analysts TEXT"))
             if "searxng_base_url" not in llm_columns:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN searxng_base_url VARCHAR(500)"))
+            if "news_data_strategy" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN news_data_strategy VARCHAR(20)"))
+            if "news_hybrid_min_items" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN news_hybrid_min_items INTEGER"))
+            if "news_hybrid_min_confidence" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN news_hybrid_min_confidence FLOAT"))
+            if "news_aggregate_max_items" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN news_aggregate_max_items INTEGER"))
+            if "news_aggregate_max_chars" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN news_aggregate_max_chars INTEGER"))
+            if "news_dedupe_enabled" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN news_dedupe_enabled BOOLEAN"))
+            if "tushare_enabled" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_enabled BOOLEAN"))
+            if "tushare_token_encrypted" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_token_encrypted TEXT"))
+            if "tushare_timeout" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_timeout INTEGER"))
+            if "tushare_rate_limit_per_minute" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_rate_limit_per_minute INTEGER"))
+            if "tushare_cache_ttl_seconds" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_cache_ttl_seconds INTEGER"))
+            if "tushare_capability_cache_ttl_seconds" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_capability_cache_ttl_seconds INTEGER"))
+            if "tushare_capabilities" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_capabilities JSON"))
+            if "tushare_last_checked_at" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_last_checked_at DATETIME"))
     except Exception as e:
         logger.error("Failed to ensure user schema: %s", e)
 
@@ -191,25 +219,29 @@ def _migrate_api_keys_reencrypt() -> None:
             rows = conn.execute(
                 text(
                     """
-                    SELECT user_id, api_key_encrypted, wecom_webhook_encrypted
+                    SELECT user_id, api_key_encrypted, wecom_webhook_encrypted, tushare_token_encrypted
                     FROM user_llm_configs
-                    WHERE api_key_encrypted IS NOT NULL OR wecom_webhook_encrypted IS NOT NULL
+                    WHERE api_key_encrypted IS NOT NULL
+                       OR wecom_webhook_encrypted IS NOT NULL
+                       OR tushare_token_encrypted IS NOT NULL
                     """
                 )
             ).fetchall()
             if not rows:
                 return
             # Quick check: if the first row decrypts fine, likely all are OK already.
-            _, first_api_key, first_wecom_webhook = rows[0]
-            first_secret = first_api_key or first_wecom_webhook
+            first_row = rows[0]
+            first_secret = next((v for v in first_row[1:] if v), None)
             if first_secret and decrypt_secret(first_secret) is not None and len(rows) < 50:
                 # Small dataset, still verify all — but for large sets, skip if first is OK
                 pass
             migrated = 0
-            for user_id, encrypted_api_key, encrypted_wecom_webhook in rows:
+            for row in rows:
+                user_id = row[0]
                 for column_name, encrypted_value in (
-                    ("api_key_encrypted", encrypted_api_key),
-                    ("wecom_webhook_encrypted", encrypted_wecom_webhook),
+                    ("api_key_encrypted", row[1]),
+                    ("wecom_webhook_encrypted", row[2]),
+                    ("tushare_token_encrypted", row[3]),
                 ):
                     if not encrypted_value:
                         continue
@@ -224,16 +256,10 @@ def _migrate_api_keys_reencrypt() -> None:
                         )
                         continue
                     new_encrypted = encrypt_secret(plaintext)
-                    if column_name == "api_key_encrypted":
-                        conn.execute(
-                            text("UPDATE user_llm_configs SET api_key_encrypted = :enc WHERE user_id = :uid"),
-                            {"enc": new_encrypted, "uid": user_id},
-                        )
-                    elif column_name == "wecom_webhook_encrypted":
-                        conn.execute(
-                            text("UPDATE user_llm_configs SET wecom_webhook_encrypted = :enc WHERE user_id = :uid"),
-                            {"enc": new_encrypted, "uid": user_id},
-                        )
+                    conn.execute(
+                        text(f"UPDATE user_llm_configs SET {column_name} = :enc WHERE user_id = :uid"),
+                        {"enc": new_encrypted, "uid": user_id},
+                    )
                     migrated += 1
             if migrated:
                 logger.info("[security] Re-encrypted %s user secret(s) with new TA_APP_SECRET_KEY.", migrated)
@@ -357,6 +383,20 @@ class UserLLMConfigDB(Base):
     max_debate_rounds = Column(Integer, nullable=True)
     max_risk_discuss_rounds = Column(Integer, nullable=True)
     searxng_base_url = Column(String(500), nullable=True)
+    news_data_strategy = Column(String(20), nullable=True)
+    news_hybrid_min_items = Column(Integer, nullable=True)
+    news_hybrid_min_confidence = Column(Float, nullable=True)
+    news_aggregate_max_items = Column(Integer, nullable=True)
+    news_aggregate_max_chars = Column(Integer, nullable=True)
+    news_dedupe_enabled = Column(Boolean, nullable=True)
+    tushare_enabled = Column(Boolean, nullable=True)
+    tushare_token_encrypted = Column(Text, nullable=True)
+    tushare_timeout = Column(Integer, nullable=True)
+    tushare_rate_limit_per_minute = Column(Integer, nullable=True)
+    tushare_cache_ttl_seconds = Column(Integer, nullable=True)
+    tushare_capability_cache_ttl_seconds = Column(Integer, nullable=True)
+    tushare_capabilities = Column(JSON, nullable=True)
+    tushare_last_checked_at = Column(DateTime, nullable=True)
     api_key_encrypted = Column(Text, nullable=True)
     wecom_webhook_encrypted = Column(Text, nullable=True)
     default_analysts = Column(Text, nullable=True)  # JSON list, e.g. '["market","social",...]'
@@ -481,5 +521,3 @@ class ImportedPortfolioPositionDB(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'source', 'symbol', name='uq_imported_portfolio_user_source_symbol'),
     )
-
-

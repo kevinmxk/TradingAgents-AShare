@@ -560,6 +560,12 @@ export interface RuntimeConfig {
     quick_think_llm: string
     backend_url: string
     searxng_base_url: string
+    news_data_strategy?: 'fallback' | 'hybrid' | 'aggregate'
+    news_hybrid_min_items?: number
+    news_hybrid_min_confidence?: number
+    news_aggregate_max_items?: number
+    news_aggregate_max_chars?: number
+    news_dedupe_enabled?: boolean
     max_debate_rounds: number
     max_risk_discuss_rounds: number
     has_api_key?: boolean
@@ -585,6 +591,12 @@ export interface RuntimeConfigUpdate {
     quick_think_llm?: string
     backend_url?: string
     searxng_base_url?: string
+    news_data_strategy?: 'fallback' | 'hybrid' | 'aggregate'
+    news_hybrid_min_items?: number
+    news_hybrid_min_confidence?: number
+    news_aggregate_max_items?: number
+    news_aggregate_max_chars?: number
+    news_dedupe_enabled?: boolean
     max_debate_rounds?: number
     max_risk_discuss_rounds?: number
     api_key?: string
@@ -627,6 +639,52 @@ export interface SearxngTestResponse {
     base_url: string
     result_count: number
     message: string
+}
+
+export type TushareCapabilityStatus =
+    | 'available'
+    | 'permission_denied'
+    | 'rate_limited'
+    | 'invalid_token'
+    | 'empty_result'
+    | 'network_error'
+    | 'server_error'
+    | 'unknown_error'
+    | 'not_configured'
+    | 'not_supported_first_version'
+
+export interface TushareSettings {
+    enabled: boolean
+    token_configured: boolean
+    token_masked?: string | null
+    timeout: number
+    rate_limit_per_minute: number
+    cache_ttl_seconds: number
+    capability_cache_ttl_seconds: number
+    capabilities: Record<string, TushareCapabilityStatus | string>
+    last_checked_at?: string | null
+}
+
+export interface TushareSettingsUpdate {
+    enabled?: boolean
+    token?: string
+    clear_token?: boolean
+    timeout?: number
+    rate_limit_per_minute?: number
+    cache_ttl_seconds?: number
+    capability_cache_ttl_seconds?: number
+}
+
+export interface TushareTestResponse {
+    success: boolean
+    status: TushareCapabilityStatus | string
+    message: string
+    sample_row_count: number
+}
+
+export interface TushareProbeResponse {
+    capabilities: Record<string, TushareCapabilityStatus | string>
+    last_checked_at: string
 }
 
 export interface WecomWarmupRequest {

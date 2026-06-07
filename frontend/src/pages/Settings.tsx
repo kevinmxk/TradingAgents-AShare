@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Save, Key, Database, Loader2, Trash2, Link2, Copy, Plus, CheckCircle2, Mail, Flame, Webhook } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
-import type { RuntimeWarmupResult, UserToken } from '@/types'
+import type { RuntimeWarmupResult, TushareSettings, UserToken } from '@/types'
 
 type ProviderPreset = {
     id: string
@@ -55,6 +55,12 @@ export default function Settings() {
     const [maxDebateRounds, setMaxDebateRounds] = useState(1)
     const [maxRiskRounds, setMaxRiskRounds] = useState(1)
     const [searxngBaseUrl, setSearxngBaseUrl] = useState('')
+    const [newsDataStrategy, setNewsDataStrategy] = useState<'fallback' | 'hybrid' | 'aggregate'>('hybrid')
+    const [newsHybridMinItems, setNewsHybridMinItems] = useState(8)
+    const [newsHybridMinConfidence, setNewsHybridMinConfidence] = useState(0.7)
+    const [newsAggregateMaxItems, setNewsAggregateMaxItems] = useState(20)
+    const [newsAggregateMaxChars, setNewsAggregateMaxChars] = useState(20000)
+    const [newsDedupeEnabled, setNewsDedupeEnabled] = useState(true)
     const [serverFallbackEnabled, setServerFallbackEnabled] = useState(true)
     const [emailReportEnabled, setEmailReportEnabled] = useState(true)
     const [wecomReportEnabled, setWecomReportEnabled] = useState(true)
@@ -73,6 +79,17 @@ export default function Settings() {
     const [searxngTesting, setSearxngTesting] = useState(false)
     const [searxngTestMessage, setSearxngTestMessage] = useState<string | null>(null)
     const [searxngTestError, setSearxngTestError] = useState<string | null>(null)
+    const [tushareSettings, setTushareSettings] = useState<TushareSettings | null>(null)
+    const [tushareEnabled, setTushareEnabled] = useState(false)
+    const [tushareToken, setTushareToken] = useState('')
+    const [tushareTimeout, setTushareTimeout] = useState(10)
+    const [tushareRateLimit, setTushareRateLimit] = useState(40)
+    const [tushareCacheTtl, setTushareCacheTtl] = useState(86400)
+    const [tushareSaving, setTushareSaving] = useState(false)
+    const [tushareTesting, setTushareTesting] = useState(false)
+    const [tushareProbing, setTushareProbing] = useState(false)
+    const [tushareMessage, setTushareMessage] = useState<string | null>(null)
+    const [tushareError, setTushareError] = useState<string | null>(null)
 
     // API Token states
     const [tokens, setTokens] = useState<UserToken[]>([])
@@ -105,6 +122,11 @@ export default function Settings() {
     }, [searxngBaseUrl])
 
     useEffect(() => {
+        setTushareMessage(null)
+        setTushareError(null)
+    }, [tushareEnabled, tushareToken, tushareTimeout, tushareRateLimit, tushareCacheTtl])
+
+    useEffect(() => {
         try {
             const stored = localStorage.getItem('tradingagents-settings')
             if (stored) {
@@ -133,6 +155,12 @@ export default function Settings() {
                 setMaxDebateRounds(cfg.max_debate_rounds)
                 setMaxRiskRounds(cfg.max_risk_discuss_rounds)
                 setSearxngBaseUrl(cfg.searxng_base_url || '')
+                setNewsDataStrategy(cfg.news_data_strategy || 'hybrid')
+                setNewsHybridMinItems(cfg.news_hybrid_min_items || 8)
+                setNewsHybridMinConfidence(cfg.news_hybrid_min_confidence ?? 0.7)
+                setNewsAggregateMaxItems(cfg.news_aggregate_max_items || 20)
+                setNewsAggregateMaxChars(cfg.news_aggregate_max_chars || 20000)
+                setNewsDedupeEnabled(cfg.news_dedupe_enabled !== false)
                 setHasStoredApiKey(!!cfg.has_api_key)
                 setHasStoredWebhook(!!cfg.has_wecom_webhook)
                 setStoredWebhookDisplay(cfg.wecom_webhook_display || '')
@@ -147,6 +175,18 @@ export default function Settings() {
                 setConfigError(err instanceof Error ? err.message : '无法连接到后端')
             })
             .finally(() => setConfigLoading(false))
+
+        api.getTushareSettings()
+            .then(settings => {
+                setTushareSettings(settings)
+                setTushareEnabled(!!settings.enabled)
+                setTushareTimeout(settings.timeout || 10)
+                setTushareRateLimit(settings.rate_limit_per_minute || 40)
+                setTushareCacheTtl(settings.cache_ttl_seconds || 86400)
+            })
+            .catch(err => {
+                setTushareError(err instanceof Error ? err.message : '无法加载 Tushare 设置')
+            })
 
         // Fetch tokens
         fetchTokens()
@@ -212,6 +252,12 @@ export default function Settings() {
         max_debate_rounds: maxDebateRounds,
         max_risk_discuss_rounds: maxRiskRounds,
         searxng_base_url: searxngBaseUrl.trim(),
+        news_data_strategy: newsDataStrategy,
+        news_hybrid_min_items: newsHybridMinItems,
+        news_hybrid_min_confidence: newsHybridMinConfidence,
+        news_aggregate_max_items: newsAggregateMaxItems,
+        news_aggregate_max_chars: newsAggregateMaxChars,
+        news_dedupe_enabled: newsDedupeEnabled,
         api_key: llmApiKey || undefined,
         ...(options?.includeWecom ? {
             wecom_webhook_url: wecomWebhook.trim() || undefined,
@@ -289,6 +335,97 @@ export default function Settings() {
             setSearxngTestError(err instanceof Error ? err.message : 'SearXNG 测试连接失败')
         } finally {
             setSearxngTesting(false)
+        }
+    }
+
+    const applyTushareSettings = (settings: TushareSettings) => {
+        setTushareSettings(settings)
+        setTushareEnabled(!!settings.enabled)
+        setTushareTimeout(settings.timeout || 10)
+        setTushareRateLimit(settings.rate_limit_per_minute || 40)
+        setTushareCacheTtl(settings.cache_ttl_seconds || 86400)
+    }
+
+    const handleSaveTushare = async () => {
+        setTushareSaving(true)
+        setTushareMessage(null)
+        setTushareError(null)
+        try {
+            const settings = await api.updateTushareSettings({
+                enabled: tushareEnabled,
+                token: tushareToken.trim() || undefined,
+                timeout: tushareTimeout,
+                rate_limit_per_minute: tushareRateLimit,
+                cache_ttl_seconds: tushareCacheTtl,
+            })
+            applyTushareSettings(settings)
+            setTushareToken('')
+            setTushareMessage('Tushare 设置已保存')
+        } catch (err) {
+            setTushareError(err instanceof Error ? err.message : '保存 Tushare 设置失败')
+        } finally {
+            setTushareSaving(false)
+        }
+    }
+
+    const handleClearTushareToken = async () => {
+        setTushareSaving(true)
+        setTushareMessage(null)
+        setTushareError(null)
+        try {
+            const settings = await api.updateTushareSettings({ clear_token: true })
+            applyTushareSettings(settings)
+            setTushareToken('')
+            setTushareMessage('Tushare token 已清除')
+        } catch (err) {
+            setTushareError(err instanceof Error ? err.message : '清除 Tushare token 失败')
+        } finally {
+            setTushareSaving(false)
+        }
+    }
+
+    const handleTestTushare = async () => {
+        setTushareTesting(true)
+        setTushareMessage(null)
+        setTushareError(null)
+        try {
+            const response = await api.testTushare(tushareToken.trim() || undefined)
+            const text = `${response.status}，样本行数 ${response.sample_row_count}。${response.message}`
+            if (response.success) {
+                setTushareMessage(text)
+            } else {
+                setTushareError(text)
+            }
+        } catch (err) {
+            setTushareError(err instanceof Error ? err.message : 'Tushare 测试连接失败')
+        } finally {
+            setTushareTesting(false)
+        }
+    }
+
+    const handleProbeTushare = async () => {
+        setTushareProbing(true)
+        setTushareMessage(null)
+        setTushareError(null)
+        try {
+            const response = await api.probeTushareCapabilities()
+            setTushareSettings(prev => ({
+                ...(prev || {
+                    enabled: tushareEnabled,
+                    token_configured: false,
+                    timeout: tushareTimeout,
+                    rate_limit_per_minute: tushareRateLimit,
+                    cache_ttl_seconds: tushareCacheTtl,
+                    capability_cache_ttl_seconds: 86400,
+                }),
+                capabilities: response.capabilities,
+                last_checked_at: response.last_checked_at,
+            }))
+            setTushareMessage('Tushare 权限检测已完成')
+        } catch (err) {
+            setTushareError(err instanceof Error ? err.message : 'Tushare 权限检测失败')
+        } finally {
+            setTushareProbing(false)
         }
     }
 
@@ -576,6 +713,285 @@ export default function Settings() {
                         </div>
                     )}
                 </div>
+
+                <div className="space-y-3">
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400">
+                        新闻源模式
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {[
+                            { key: 'fallback', title: 'Fallback 快速降级', desc: '最快：首个可用新闻源命中后停止。' },
+                            { key: 'hybrid', title: 'Hybrid 智能补充', desc: '平衡速度和完整性：首选源不足时补查后续源。' },
+                            { key: 'aggregate', title: 'Aggregate 全量聚合', desc: '最完整但更慢：查询所有新闻源并合并。' },
+                        ].map((item) => {
+                            const active = newsDataStrategy === item.key
+                            return (
+                                <button
+                                    key={item.key}
+                                    type="button"
+                                    onClick={() => setNewsDataStrategy(item.key as 'fallback' | 'hybrid' | 'aggregate')}
+                                    disabled={configLoading}
+                                    className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                                        active
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300'
+                                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300'
+                                    }`}
+                                >
+                                    <div className="text-sm font-medium">{item.title}</div>
+                                    <div className="mt-1 text-xs opacity-80">{item.desc}</div>
+                                </button>
+                            )
+                        })}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Fallback 最快；Hybrid 平衡速度和完整性；Aggregate 最完整但更慢。
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                            Hybrid 最少条数
+                        </label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={newsHybridMinItems}
+                            onChange={e => setNewsHybridMinItems(Number(e.target.value))}
+                            className="input w-full"
+                            disabled={configLoading}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                            Hybrid 最低可信分
+                        </label>
+                        <input
+                            type="number"
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            value={newsHybridMinConfidence}
+                            onChange={e => setNewsHybridMinConfidence(Number(e.target.value))}
+                            className="input w-full"
+                            disabled={configLoading}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                            聚合每源最多条数
+                        </label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={newsAggregateMaxItems}
+                            onChange={e => setNewsAggregateMaxItems(Number(e.target.value))}
+                            className="input w-full"
+                            disabled={configLoading}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                            ???????
+                        </label>
+                        <input
+                            type="number"
+                            min={1000}
+                            max={100000}
+                            step={1000}
+                            value={newsAggregateMaxChars}
+                            onChange={e => setNewsAggregateMaxChars(Number(e.target.value))}
+                            className="input w-full"
+                            disabled={configLoading}
+                        />
+                    </div>
+                    <div className="flex items-end">
+                        <button
+                            type="button"
+                            onClick={() => setNewsDedupeEnabled(!newsDedupeEnabled)}
+                            disabled={configLoading}
+                            className={`w-full rounded-xl border px-3 py-2 text-sm transition-colors ${
+                                newsDedupeEnabled
+                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                    : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300'
+                            }`}
+                            title="????? URL ?????????????????????"
+                        >
+                            ?????{newsDedupeEnabled ? '??' : '??'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="card space-y-4">
+                <div className="flex items-center gap-2">
+                    <Database className="w-5 h-5 text-emerald-500" />
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Tushare 数据源</h2>
+                </div>
+
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Tushare token 用于结构化行情和财务数据。低积分账号可能只能访问部分接口，系统会自动检测权限并对不可用接口回退到其他数据源。
+                    第一版行情使用 Tushare daily 未复权日线，技术指标也按未复权价格计算，不等同于前复权或后复权口径。
+                </p>
+
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-slate-700/80 dark:bg-slate-900/40">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <div className="text-sm font-medium text-slate-700 dark:text-slate-200">启用 Tushare</div>
+                            <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                                {tushareSettings?.token_configured
+                                    ? `已配置 token：${tushareSettings.token_masked || '********'}`
+                                    : '未配置 token'}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setTushareEnabled(!tushareEnabled)}
+                            disabled={configLoading || tushareSaving}
+                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                                tushareEnabled ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'
+                            }`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tushareEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                        Tushare Token
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                            type="password"
+                            value={tushareToken}
+                            onChange={e => setTushareToken(e.target.value)}
+                            className="input flex-1 font-mono"
+                            placeholder={tushareSettings?.token_configured ? '已保存，留空则保持不变' : '输入 Tushare Pro token'}
+                            disabled={configLoading || tushareSaving}
+                            autoComplete="new-password"
+                        />
+                        {tushareSettings?.token_configured && (
+                            <button
+                                type="button"
+                                onClick={handleClearTushareToken}
+                                disabled={tushareSaving}
+                                className="inline-flex items-center justify-center gap-1 text-xs text-slate-400 hover:text-rose-500 disabled:opacity-50 shrink-0"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                                清除
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">请求超时（秒）</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={120}
+                            value={tushareTimeout}
+                            onChange={e => setTushareTimeout(Number(e.target.value))}
+                            className="input w-full"
+                            disabled={configLoading || tushareSaving}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">每分钟限流</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={500}
+                            value={tushareRateLimit}
+                            onChange={e => setTushareRateLimit(Number(e.target.value))}
+                            className="input w-full"
+                            disabled={configLoading || tushareSaving}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">缓存 TTL（秒）</label>
+                        <input
+                            type="number"
+                            min={0}
+                            max={2592000}
+                            value={tushareCacheTtl}
+                            onChange={e => setTushareCacheTtl(Number(e.target.value))}
+                            className="input w-full"
+                            disabled={configLoading || tushareSaving}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={handleSaveTushare}
+                        disabled={configLoading || tushareSaving}
+                        className="btn-primary inline-flex items-center gap-2"
+                    >
+                        {tushareSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        保存 Tushare
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleTestTushare}
+                        disabled={configLoading || tushareTesting || (!tushareToken.trim() && !tushareSettings?.token_configured)}
+                        className="btn-secondary inline-flex items-center gap-2"
+                    >
+                        {tushareTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flame className="w-4 h-4" />}
+                        测试连接
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleProbeTushare}
+                        disabled={configLoading || tushareProbing || !tushareSettings?.token_configured}
+                        className="btn-secondary inline-flex items-center gap-2"
+                    >
+                        {tushareProbing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                        检测权限
+                    </button>
+                </div>
+
+                {tushareMessage && (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                        {tushareMessage}
+                    </div>
+                )}
+                {tushareError && (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+                        {tushareError}
+                    </div>
+                )}
+
+                {tushareSettings && Object.keys(tushareSettings.capabilities || {}).length > 0 && (
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                            <thead className="bg-slate-50 dark:bg-slate-900/70">
+                                <tr>
+                                    <th className="px-3 py-2 text-left font-medium text-slate-500 dark:text-slate-400">接口</th>
+                                    <th className="px-3 py-2 text-left font-medium text-slate-500 dark:text-slate-400">状态</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {Object.entries(tushareSettings.capabilities).map(([name, status]) => (
+                                    <tr key={name}>
+                                        <td className="px-3 py-2 font-mono text-xs text-slate-700 dark:text-slate-200">{name}</td>
+                                        <td className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">{status}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {tushareSettings.last_checked_at && (
+                            <div className="border-t border-slate-100 px-3 py-2 text-xs text-slate-400 dark:border-slate-800">
+                                最近检测：{new Date(tushareSettings.last_checked_at).toLocaleString()}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="card space-y-4">

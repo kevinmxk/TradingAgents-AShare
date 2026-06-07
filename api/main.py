@@ -811,6 +811,12 @@ class UserRuntimeConfigResponse(BaseModel):
     quick_think_llm: str
     backend_url: str
     searxng_base_url: str
+    news_data_strategy: Literal["fallback", "hybrid", "aggregate"] = "hybrid"
+    news_hybrid_min_items: int = 8
+    news_hybrid_min_confidence: float = 0.70
+    news_aggregate_max_items: int = 20
+    news_aggregate_max_chars: int = 20000
+    news_dedupe_enabled: bool = True
     max_debate_rounds: int
     max_risk_discuss_rounds: int
     has_api_key: bool = False
@@ -828,6 +834,12 @@ class UserRuntimeConfigUpdateRequest(BaseModel):
     quick_think_llm: Optional[str] = None
     backend_url: Optional[str] = None
     searxng_base_url: Optional[str] = None
+    news_data_strategy: Optional[Literal["fallback", "hybrid", "aggregate"]] = None
+    news_hybrid_min_items: Optional[int] = Field(None, ge=1, le=100)
+    news_hybrid_min_confidence: Optional[float] = Field(None, ge=0, le=1)
+    news_aggregate_max_items: Optional[int] = Field(None, ge=1, le=100)
+    news_aggregate_max_chars: Optional[int] = Field(None, ge=1000, le=100000)
+    news_dedupe_enabled: Optional[bool] = None
     max_debate_rounds: Optional[int] = None
     max_risk_discuss_rounds: Optional[int] = None
     email_report_enabled: Optional[bool] = None
@@ -854,6 +866,44 @@ class SearxngTestResponse(BaseModel):
     base_url: str
     result_count: int = 0
     message: str
+
+
+class TushareSettingsResponse(BaseModel):
+    enabled: bool
+    token_configured: bool
+    token_masked: Optional[str] = None
+    timeout: int
+    rate_limit_per_minute: int
+    cache_ttl_seconds: int
+    capability_cache_ttl_seconds: int
+    capabilities: Dict[str, str] = Field(default_factory=dict)
+    last_checked_at: Optional[str] = None
+
+
+class TushareSettingsUpdateRequest(BaseModel):
+    enabled: Optional[bool] = None
+    token: Optional[str] = None
+    clear_token: bool = False
+    timeout: Optional[int] = Field(None, ge=1, le=120)
+    rate_limit_per_minute: Optional[int] = Field(None, ge=1, le=500)
+    cache_ttl_seconds: Optional[int] = Field(None, ge=0, le=30 * 86400)
+    capability_cache_ttl_seconds: Optional[int] = Field(None, ge=0, le=30 * 86400)
+
+
+class TushareTestRequest(BaseModel):
+    token: Optional[str] = None
+
+
+class TushareTestResponse(BaseModel):
+    success: bool
+    status: str
+    message: str
+    sample_row_count: int = 0
+
+
+class TushareProbeResponse(BaseModel):
+    capabilities: Dict[str, str]
+    last_checked_at: str
 
 
 class RuntimeWarmupResult(BaseModel):
@@ -955,6 +1005,19 @@ def _user_config_overrides(user_id: Optional[str], db: Optional[Session] = None)
             "max_debate_rounds",
             "max_risk_discuss_rounds",
             "searxng_base_url",
+            "news_data_strategy",
+            "news_hybrid_min_items",
+            "news_hybrid_min_confidence",
+            "news_aggregate_max_items",
+            "news_aggregate_max_chars",
+            "news_dedupe_enabled",
+            "tushare_enabled",
+            "tushare_timeout",
+            "tushare_rate_limit_per_minute",
+            "tushare_cache_ttl_seconds",
+            "tushare_capability_cache_ttl_seconds",
+            "tushare_capabilities",
+            "tushare_last_checked_at",
         ):
             value = getattr(user_cfg, key, None)
             if value is not None:
@@ -962,6 +1025,9 @@ def _user_config_overrides(user_id: Optional[str], db: Optional[Session] = None)
         api_key = auth_service.decrypt_secret(user_cfg.api_key_encrypted)
         if api_key:
             result["api_key"] = api_key
+        tushare_token = auth_service.decrypt_secret(user_cfg.tushare_token_encrypted)
+        if tushare_token:
+            result["tushare_token"] = tushare_token
         return result
 
     if db is not None:
@@ -994,6 +1060,14 @@ def _build_runtime_config(overrides: Dict[str, Any], user_id: Optional[str] = No
         config = _deep_merge(config, filtered_user_overrides)
     if filtered_request_overrides:
         config = _deep_merge(config, filtered_request_overrides)
+
+    if config.get("tushare_enabled") and str(config.get("tushare_token") or "").strip():
+        data_vendors = config.setdefault("data_vendors", {})
+        for category in ("core_stock_apis", "technical_indicators", "fundamental_data"):
+            chain = str(data_vendors.get(category) or "")
+            vendors = [v.strip() for v in chain.split(",") if v.strip()]
+            vendors = ["cn_tushare"] + [v for v in vendors if v != "cn_tushare"]
+            data_vendors[category] = ",".join(vendors)
 
     # ── Intelligent fallback between models ──
     # If one is provided but the other is missing (even after env var merge), cross-fill.
@@ -3400,6 +3474,8 @@ def delete_backtest(job_id: str) -> Dict:
 _CONFIG_ALLOWED_KEYS = {
     "llm_provider", "deep_think_llm", "quick_think_llm",
     "backend_url", "searxng_base_url", "max_debate_rounds", "max_risk_discuss_rounds",
+    "news_data_strategy", "news_hybrid_min_items", "news_hybrid_min_confidence",
+    "news_aggregate_max_items", "news_aggregate_max_chars", "news_dedupe_enabled",
 }
 _CONFIG_PREFERENCE_KEYS = {"email_report_enabled", "wecom_report_enabled"}
 _CONFIG_MODEL_KEYS = ("llm_provider", "backend_url", "quick_think_llm", "deep_think_llm")
@@ -3432,6 +3508,51 @@ def _mask_secret_value(value: Optional[str], *, head: int = 4, tail: int = 4) ->
     if len(normalized) <= head + tail:
         return "*" * max(6, len(normalized))
     return f"{normalized[:head]}{'*' * max(6, len(normalized) - head - tail)}{normalized[-tail:]}"
+
+
+def _mask_tushare_token(token: Optional[str]) -> Optional[str]:
+    normalized = str(token or "").strip()
+    if not normalized:
+        return None
+    return "********" + normalized[-4:]
+
+
+def _tushare_token_for_user(user_cfg: Optional[UserLLMConfigDB]) -> Optional[str]:
+    if user_cfg and user_cfg.tushare_token_encrypted:
+        token = auth_service.decrypt_secret(user_cfg.tushare_token_encrypted)
+        if token:
+            return token
+    env_token = str(DEFAULT_CONFIG.get("tushare_token") or "").strip()
+    return env_token or None
+
+
+def _tushare_settings_response(user_cfg: Optional[UserLLMConfigDB]) -> TushareSettingsResponse:
+    token = _tushare_token_for_user(user_cfg)
+    last_checked = getattr(user_cfg, "tushare_last_checked_at", None) if user_cfg else None
+    return TushareSettingsResponse(
+        enabled=(
+            bool(user_cfg.tushare_enabled)
+            if user_cfg and user_cfg.tushare_enabled is not None
+            else bool(DEFAULT_CONFIG.get("tushare_enabled", False))
+        ),
+        token_configured=bool(token),
+        token_masked=_mask_tushare_token(token),
+        timeout=int(getattr(user_cfg, "tushare_timeout", None) or DEFAULT_CONFIG["tushare_timeout"]),
+        rate_limit_per_minute=int(
+            getattr(user_cfg, "tushare_rate_limit_per_minute", None)
+            or DEFAULT_CONFIG["tushare_rate_limit_per_minute"]
+        ),
+        cache_ttl_seconds=int(
+            getattr(user_cfg, "tushare_cache_ttl_seconds", None)
+            or DEFAULT_CONFIG["tushare_cache_ttl_seconds"]
+        ),
+        capability_cache_ttl_seconds=int(
+            getattr(user_cfg, "tushare_capability_cache_ttl_seconds", None)
+            or DEFAULT_CONFIG["tushare_capability_cache_ttl_seconds"]
+        ),
+        capabilities=(getattr(user_cfg, "tushare_capabilities", None) if user_cfg else None) or {},
+        last_checked_at=_serialize_datetime_utc(last_checked),
+    )
 
 
 def _mask_wecom_webhook(webhook_url: Optional[str]) -> Optional[str]:
@@ -3657,6 +3778,12 @@ def _config_response_for_user(user: Optional[UserDB], db: Session) -> UserRuntim
         quick_think_llm=cfg["quick_think_llm"],
         backend_url=cfg["backend_url"],
         searxng_base_url=cfg["searxng_base_url"],
+        news_data_strategy=cfg.get("news_data_strategy", "hybrid"),
+        news_hybrid_min_items=int(cfg.get("news_hybrid_min_items", 8)),
+        news_hybrid_min_confidence=float(cfg.get("news_hybrid_min_confidence", 0.70)),
+        news_aggregate_max_items=int(cfg.get("news_aggregate_max_items", 20)),
+        news_aggregate_max_chars=int(cfg.get("news_aggregate_max_chars", 20000)),
+        news_dedupe_enabled=bool(cfg.get("news_dedupe_enabled", True)),
         max_debate_rounds=cfg["max_debate_rounds"],
         max_risk_discuss_rounds=cfg["max_risk_discuss_rounds"],
         has_api_key=bool(user_cfg and user_cfg.api_key_encrypted),
@@ -3743,6 +3870,12 @@ def update_runtime_config(
         quick_think_llm=updates.quick_think_llm,
         backend_url=updates.backend_url,
         searxng_base_url=(normalized_searxng_base_url or "") if updates.searxng_base_url is not None else None,
+        news_data_strategy=updates.news_data_strategy,
+        news_hybrid_min_items=updates.news_hybrid_min_items,
+        news_hybrid_min_confidence=updates.news_hybrid_min_confidence,
+        news_aggregate_max_items=updates.news_aggregate_max_items,
+        news_aggregate_max_chars=updates.news_aggregate_max_chars,
+        news_dedupe_enabled=updates.news_dedupe_enabled,
         max_debate_rounds=updates.max_debate_rounds,
         max_risk_discuss_rounds=updates.max_risk_discuss_rounds,
         api_key=updates.api_key,
@@ -3867,6 +4000,93 @@ def test_searxng_config(
             "result_count": 0,
             "message": f"SearXNG 连接失败：{str(exc)[:200]}",
         }
+
+
+@app.get("/settings/data-sources/tushare", response_model=TushareSettingsResponse)
+@app.get("/v1/settings/data-sources/tushare", response_model=TushareSettingsResponse)
+def get_tushare_settings(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    user_cfg = auth_service.get_user_llm_config(db, current_user.id)
+    return _tushare_settings_response(user_cfg)
+
+
+@app.post("/settings/data-sources/tushare", response_model=TushareSettingsResponse)
+@app.post("/v1/settings/data-sources/tushare", response_model=TushareSettingsResponse)
+def save_tushare_settings(
+    request: TushareSettingsUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    token = (request.token or "").strip()
+    row = auth_service.upsert_user_llm_config(
+        db,
+        current_user.id,
+        tushare_enabled=request.enabled,
+        tushare_token=token or None,
+        clear_tushare_token=request.clear_token,
+        tushare_timeout=request.timeout,
+        tushare_rate_limit_per_minute=request.rate_limit_per_minute,
+        tushare_cache_ttl_seconds=request.cache_ttl_seconds,
+        tushare_capability_cache_ttl_seconds=request.capability_cache_ttl_seconds,
+    )
+    return _tushare_settings_response(row)
+
+
+@app.post("/settings/data-sources/tushare/test", response_model=TushareTestResponse)
+@app.post("/v1/settings/data-sources/tushare/test", response_model=TushareTestResponse)
+def test_tushare_settings(
+    request: TushareTestRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    from tradingagents.dataflows.providers.cn_tushare_provider import CnTushareProvider
+
+    user_cfg = auth_service.get_user_llm_config(db, current_user.id)
+    token = (request.token or "").strip() or _tushare_token_for_user(user_cfg)
+    if not token:
+        return TushareTestResponse(
+            success=False,
+            status="not_configured",
+            message="Tushare token is not configured.",
+            sample_row_count=0,
+        )
+    rate_limit = int(
+        getattr(user_cfg, "tushare_rate_limit_per_minute", None)
+        or DEFAULT_CONFIG["tushare_rate_limit_per_minute"]
+    )
+    timeout = int(getattr(user_cfg, "tushare_timeout", None) or DEFAULT_CONFIG["tushare_timeout"])
+    return CnTushareProvider.test_connection(token, rate_limit_per_minute=rate_limit, timeout=timeout)
+
+
+@app.post("/settings/data-sources/tushare/probe-capabilities", response_model=TushareProbeResponse)
+@app.post("/v1/settings/data-sources/tushare/probe-capabilities", response_model=TushareProbeResponse)
+def probe_tushare_capabilities(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    from tradingagents.dataflows.providers.cn_tushare_provider import CnTushareProvider
+
+    user_cfg = auth_service.get_user_llm_config(db, current_user.id)
+    token = _tushare_token_for_user(user_cfg)
+    rate_limit = int(
+        getattr(user_cfg, "tushare_rate_limit_per_minute", None)
+        or DEFAULT_CONFIG["tushare_rate_limit_per_minute"]
+    )
+    timeout = int(getattr(user_cfg, "tushare_timeout", None) or DEFAULT_CONFIG["tushare_timeout"])
+    capabilities = CnTushareProvider.probe_capabilities(token or "", rate_limit_per_minute=rate_limit, timeout=timeout)
+    checked_at = datetime.now(timezone.utc)
+    auth_service.upsert_user_llm_config(
+        db,
+        current_user.id,
+        tushare_capabilities=capabilities,
+        tushare_last_checked_at=checked_at,
+    )
+    return {
+        "capabilities": capabilities,
+        "last_checked_at": checked_at.isoformat(),
+    }
 
 
 @app.post("/v1/config/wecom/warmup", response_model=WecomWebhookWarmupResponse)
