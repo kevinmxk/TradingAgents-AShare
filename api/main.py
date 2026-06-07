@@ -319,6 +319,7 @@ _global_config_overrides: Dict[str, Any] = {}
 _CONFIG_OVERRIDES_ALLOWLIST = {
     "llm_provider", "deep_think_llm", "quick_think_llm",
     "max_debate_rounds", "max_risk_discuss_rounds",
+    "searxng_base_url",
     "prompt_language",
 }
 # Hold references to fire-and-forget tasks so they are not garbage collected
@@ -809,6 +810,7 @@ class UserRuntimeConfigResponse(BaseModel):
     deep_think_llm: str
     quick_think_llm: str
     backend_url: str
+    searxng_base_url: str
     max_debate_rounds: int
     max_risk_discuss_rounds: int
     has_api_key: bool = False
@@ -825,6 +827,7 @@ class UserRuntimeConfigUpdateRequest(BaseModel):
     deep_think_llm: Optional[str] = None
     quick_think_llm: Optional[str] = None
     backend_url: Optional[str] = None
+    searxng_base_url: Optional[str] = None
     max_debate_rounds: Optional[int] = None
     max_risk_discuss_rounds: Optional[int] = None
     email_report_enabled: Optional[bool] = None
@@ -840,6 +843,17 @@ class UserRuntimeConfigUpdateRequest(BaseModel):
 
 class UserRuntimeWarmupRequest(UserRuntimeConfigUpdateRequest):
     prompt: str = "你好"
+
+
+class SearxngTestRequest(BaseModel):
+    searxng_base_url: Optional[str] = None
+
+
+class SearxngTestResponse(BaseModel):
+    ok: bool
+    base_url: str
+    result_count: int = 0
+    message: str
 
 
 class RuntimeWarmupResult(BaseModel):
@@ -940,6 +954,7 @@ def _user_config_overrides(user_id: Optional[str], db: Optional[Session] = None)
             "deep_think_llm",
             "max_debate_rounds",
             "max_risk_discuss_rounds",
+            "searxng_base_url",
         ):
             value = getattr(user_cfg, key, None)
             if value is not None:
@@ -3384,7 +3399,7 @@ def delete_backtest(job_id: str) -> Dict:
 
 _CONFIG_ALLOWED_KEYS = {
     "llm_provider", "deep_think_llm", "quick_think_llm",
-    "backend_url", "max_debate_rounds", "max_risk_discuss_rounds",
+    "backend_url", "searxng_base_url", "max_debate_rounds", "max_risk_discuss_rounds",
 }
 _CONFIG_PREFERENCE_KEYS = {"email_report_enabled", "wecom_report_enabled"}
 _CONFIG_MODEL_KEYS = ("llm_provider", "backend_url", "quick_think_llm", "deep_think_llm")
@@ -3396,6 +3411,18 @@ _CONFIG_PROBE_TIMEOUT_SECONDS = 12.0
 _CONFIG_PROBE_PROMPT = "Reply with the single word OK."
 _CONFIG_WARMUP_TIMEOUT_SECONDS = 20.0
 _CONFIG_WARMUP_PROMPT = "Reply with the single word OK."
+
+
+def _normalize_searxng_base_url(value: Optional[str]) -> Optional[str]:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    if not (normalized.startswith("http://") or normalized.startswith("https://")):
+        raise HTTPException(
+            status_code=400,
+            detail="SearXNG 接口地址必须以 http:// 或 https:// 开头",
+        )
+    return normalized.rstrip("/")
 
 
 def _mask_secret_value(value: Optional[str], *, head: int = 4, tail: int = 4) -> Optional[str]:
@@ -3473,7 +3500,7 @@ def _build_pending_runtime_config(
     for key in _CONFIG_ALLOWED_KEYS:
         value = getattr(updates, key, None)
         if value is not None:
-            config[key] = value
+            config[key] = _normalize_searxng_base_url(value) if key == "searxng_base_url" else value
 
     if updates.clear_api_key:
         config["api_key"] = ""
@@ -3629,6 +3656,7 @@ def _config_response_for_user(user: Optional[UserDB], db: Session) -> UserRuntim
         deep_think_llm=cfg["deep_think_llm"],
         quick_think_llm=cfg["quick_think_llm"],
         backend_url=cfg["backend_url"],
+        searxng_base_url=cfg["searxng_base_url"],
         max_debate_rounds=cfg["max_debate_rounds"],
         max_risk_discuss_rounds=cfg["max_risk_discuss_rounds"],
         has_api_key=bool(user_cfg and user_cfg.api_key_encrypted),
@@ -3687,6 +3715,9 @@ def update_runtime_config(
     current_user: UserDB = Depends(_require_web_user),
 ):
     """更新当前用户运行时配置，下次分析时生效。"""
+    normalized_searxng_base_url = None
+    if updates.searxng_base_url is not None:
+        normalized_searxng_base_url = _normalize_searxng_base_url(updates.searxng_base_url)
     normalized_wecom_webhook = None
     if updates.wecom_webhook_url:
         from api.services.wecom_notification_service import normalize_webhook_url
@@ -3711,6 +3742,7 @@ def update_runtime_config(
         deep_think_llm=updates.deep_think_llm,
         quick_think_llm=updates.quick_think_llm,
         backend_url=updates.backend_url,
+        searxng_base_url=(normalized_searxng_base_url or "") if updates.searxng_base_url is not None else None,
         max_debate_rounds=updates.max_debate_rounds,
         max_risk_discuss_rounds=updates.max_risk_discuss_rounds,
         api_key=updates.api_key,
@@ -3794,6 +3826,47 @@ def warmup_runtime_config(
         "prompt": prompt,
         "results": results,
     }
+
+
+@app.post("/v1/config/searxng/test", response_model=SearxngTestResponse)
+def test_searxng_config(
+    request: SearxngTestRequest,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(_require_web_user),
+):
+    config = _build_runtime_config({}, user_id=current_user.id, db=db)
+    base_url = _normalize_searxng_base_url(request.searxng_base_url) if request.searxng_base_url is not None else config.get("searxng_base_url")
+    base_url = _normalize_searxng_base_url(base_url) or DEFAULT_CONFIG["searxng_base_url"]
+    try:
+        import requests
+
+        response = requests.get(
+            f"{base_url}/search",
+            params={
+                "q": "贵州茅台 公告",
+                "format": "json",
+                "language": "zh-CN",
+                "categories": "news,general",
+            },
+            headers={"Accept": "application/json"},
+            timeout=8,
+        )
+        response.raise_for_status()
+        data = response.json()
+        results = data.get("results", []) if isinstance(data, dict) else []
+        return {
+            "ok": True,
+            "base_url": base_url,
+            "result_count": len(results) if isinstance(results, list) else 0,
+            "message": "SearXNG 连接成功",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "base_url": base_url,
+            "result_count": 0,
+            "message": f"SearXNG 连接失败：{str(exc)[:200]}",
+        }
 
 
 @app.post("/v1/config/wecom/warmup", response_model=WecomWebhookWarmupResponse)

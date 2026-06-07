@@ -13,6 +13,7 @@ baostock
 stockstats
 rank-bm25
 requests
+beautifulsoup4
 setuptools
 fastapi
 uvicorn

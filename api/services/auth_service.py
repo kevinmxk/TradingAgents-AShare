@@ -250,6 +250,7 @@ def upsert_user_llm_config(
     deep_think_llm: Optional[str] = None,
     max_debate_rounds: Optional[int] = None,
     max_risk_discuss_rounds: Optional[int] = None,
+    searxng_base_url: Optional[str] = None,
     api_key: Optional[str] = None,
     wecom_webhook_url: Optional[str] = None,
     clear_api_key: bool = False,
@@ -274,6 +275,8 @@ def upsert_user_llm_config(
         row.max_debate_rounds = max_debate_rounds
     if max_risk_discuss_rounds is not None:
         row.max_risk_discuss_rounds = max_risk_discuss_rounds
+    if searxng_base_url is not None:
+        row.searxng_base_url = searxng_base_url or None
 
     if clear_api_key:
         row.api_key_encrypted = None

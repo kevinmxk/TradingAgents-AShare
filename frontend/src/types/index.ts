@@ -559,6 +559,7 @@ export interface RuntimeConfig {
     deep_think_llm: string
     quick_think_llm: string
     backend_url: string
+    searxng_base_url: string
     max_debate_rounds: number
     max_risk_discuss_rounds: number
     has_api_key?: boolean
@@ -583,6 +584,7 @@ export interface RuntimeConfigUpdate {
     deep_think_llm?: string
     quick_think_llm?: string
     backend_url?: string
+    searxng_base_url?: string
     max_debate_rounds?: number
     max_risk_discuss_rounds?: number
     api_key?: string
@@ -618,6 +620,13 @@ export interface RuntimeWarmupResult {
 export interface RuntimeWarmupResponse {
     prompt: string
     results: RuntimeWarmupResult[]
+}
+
+export interface SearxngTestResponse {
+    ok: boolean
+    base_url: string
+    result_count: number
+    message: string
 }
 
 export interface WecomWarmupRequest {

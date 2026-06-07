@@ -136,6 +136,8 @@ def _ensure_user_schema() -> None:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN wecom_webhook_encrypted TEXT"))
             if "default_analysts" not in llm_columns:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN default_analysts TEXT"))
+            if "searxng_base_url" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN searxng_base_url VARCHAR(500)"))
     except Exception as e:
         logger.error("Failed to ensure user schema: %s", e)
 
@@ -354,6 +356,7 @@ class UserLLMConfigDB(Base):
     deep_think_llm = Column(String(255), nullable=True)
     max_debate_rounds = Column(Integer, nullable=True)
     max_risk_discuss_rounds = Column(Integer, nullable=True)
+    searxng_base_url = Column(String(500), nullable=True)
     api_key_encrypted = Column(Text, nullable=True)
     wecom_webhook_encrypted = Column(Text, nullable=True)
     default_analysts = Column(Text, nullable=True)  # JSON list, e.g. '["market","social",...]'

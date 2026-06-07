@@ -54,6 +54,7 @@ export default function Settings() {
     const [quickThinkLlm, setQuickThinkLlm] = useState('')
     const [maxDebateRounds, setMaxDebateRounds] = useState(1)
     const [maxRiskRounds, setMaxRiskRounds] = useState(1)
+    const [searxngBaseUrl, setSearxngBaseUrl] = useState('')
     const [serverFallbackEnabled, setServerFallbackEnabled] = useState(true)
     const [emailReportEnabled, setEmailReportEnabled] = useState(true)
     const [wecomReportEnabled, setWecomReportEnabled] = useState(true)
@@ -69,6 +70,9 @@ export default function Settings() {
     const [wecomWarmingUp, setWecomWarmingUp] = useState(false)
     const [wecomWarmupMessage, setWecomWarmupMessage] = useState<string | null>(null)
     const [wecomWarmupError, setWecomWarmupError] = useState<string | null>(null)
+    const [searxngTesting, setSearxngTesting] = useState(false)
+    const [searxngTestMessage, setSearxngTestMessage] = useState<string | null>(null)
+    const [searxngTestError, setSearxngTestError] = useState<string | null>(null)
 
     // API Token states
     const [tokens, setTokens] = useState<UserToken[]>([])
@@ -94,6 +98,11 @@ export default function Settings() {
         setWecomWarmupMessage(null)
         setWecomWarmupError(null)
     }, [wecomWebhook])
+
+    useEffect(() => {
+        setSearxngTestMessage(null)
+        setSearxngTestError(null)
+    }, [searxngBaseUrl])
 
     useEffect(() => {
         try {
@@ -123,6 +132,7 @@ export default function Settings() {
                 setQuickThinkLlm(cfg.quick_think_llm)
                 setMaxDebateRounds(cfg.max_debate_rounds)
                 setMaxRiskRounds(cfg.max_risk_discuss_rounds)
+                setSearxngBaseUrl(cfg.searxng_base_url || '')
                 setHasStoredApiKey(!!cfg.has_api_key)
                 setHasStoredWebhook(!!cfg.has_wecom_webhook)
                 setStoredWebhookDisplay(cfg.wecom_webhook_display || '')
@@ -201,6 +211,7 @@ export default function Settings() {
         quick_think_llm: quickThinkLlm,
         max_debate_rounds: maxDebateRounds,
         max_risk_discuss_rounds: maxRiskRounds,
+        searxng_base_url: searxngBaseUrl.trim(),
         api_key: llmApiKey || undefined,
         ...(options?.includeWecom ? {
             wecom_webhook_url: wecomWebhook.trim() || undefined,
@@ -262,6 +273,25 @@ export default function Settings() {
             setWarmingUp(false)
         }
     }
+
+    const handleSearxngTest = async () => {
+        setSearxngTesting(true)
+        setSearxngTestMessage(null)
+        setSearxngTestError(null)
+        try {
+            const response = await api.testSearxng(searxngBaseUrl.trim() || undefined)
+            if (response.ok) {
+                setSearxngTestMessage(`${response.message}，返回 ${response.result_count} 条结果，地址：${response.base_url}`)
+            } else {
+                setSearxngTestError(response.message)
+            }
+        } catch (err) {
+            setSearxngTestError(err instanceof Error ? err.message : 'SearXNG 测试连接失败')
+        } finally {
+            setSearxngTesting(false)
+        }
+    }
+
     const handleClearApiKey = async () => {
         if (!hasStoredApiKey) return
         setSaving(true)
@@ -500,6 +530,51 @@ export default function Settings() {
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+
+            <div className="card space-y-4">
+                <div className="flex items-center gap-2">
+                    <Link2 className="w-5 h-5 text-cyan-500" />
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">新闻源配置</h2>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                        SearXNG 接口地址
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                            type="text"
+                            value={searxngBaseUrl}
+                            onChange={e => setSearxngBaseUrl(e.target.value)}
+                            className="input flex-1"
+                            placeholder="http://127.0.0.1:8888"
+                            disabled={configLoading}
+                        />
+                        <button
+                            type="button"
+                            onClick={handleSearxngTest}
+                            disabled={configLoading || searxngTesting}
+                            className="btn-secondary inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                        >
+                            {searxngTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flame className="w-4 h-4" />}
+                            {searxngTesting ? '测试中...' : '测试连接'}
+                        </button>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        用于 SearXNG 新闻检索服务，系统会请求 {'{地址}'}/search?format=json。留空保存后使用环境变量或默认地址。
+                    </p>
+                    {searxngTestMessage && (
+                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                            {searxngTestMessage}
+                        </div>
+                    )}
+                    {searxngTestError && (
+                        <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+                            {searxngTestError}
+                        </div>
+                    )}
                 </div>
             </div>
 
