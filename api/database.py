@@ -154,6 +154,8 @@ def _ensure_user_schema() -> None:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_enabled BOOLEAN"))
             if "tushare_token_encrypted" not in llm_columns:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_token_encrypted TEXT"))
+            if "tushare_proxy_url" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_proxy_url VARCHAR(500)"))
             if "tushare_timeout" not in llm_columns:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_timeout INTEGER"))
             if "tushare_rate_limit_per_minute" not in llm_columns:
@@ -391,6 +393,7 @@ class UserLLMConfigDB(Base):
     news_dedupe_enabled = Column(Boolean, nullable=True)
     tushare_enabled = Column(Boolean, nullable=True)
     tushare_token_encrypted = Column(Text, nullable=True)
+    tushare_proxy_url = Column(String(500), nullable=True)
     tushare_timeout = Column(Integer, nullable=True)
     tushare_rate_limit_per_minute = Column(Integer, nullable=True)
     tushare_cache_ttl_seconds = Column(Integer, nullable=True)

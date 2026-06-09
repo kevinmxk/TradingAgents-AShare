@@ -866,7 +866,7 @@ class CnAkshareProvider(BaseMarketDataProvider):
         try:
             ak = self._ak()
             with AKSHARE_CALL_LOCK:
-                df = ak.stock_board_industry_fund_flow_em(symbol="今日")
+                df = ak.stock_sector_fund_flow_rank(indicator="今日", sector_type="行业资金流")
             if df is None or df.empty:
                 return "今日板块资金流向数据暂不可用。"
             sort_col = "今日主力净流入-净额"
@@ -902,8 +902,9 @@ class CnAkshareProvider(BaseMarketDataProvider):
         try:
             ak = self._ak()
             code = self._normalize_symbol(symbol)
+            date_yyyymmdd = date.replace("-", "")
             with AKSHARE_CALL_LOCK:
-                df = ak.stock_lhb_detail_em(symbol=code, start_date=date, end_date=date)
+                df = ak.stock_lhb_stock_detail_em(symbol=code, date=date_yyyymmdd, flag="买入")
             if df is None or df.empty:
                 return f"{symbol} 在 {date} 无龙虎榜数据（非异动日属正常）。"
             return f"{symbol} 龙虎榜明细（{date}）：\n{df.head(20).to_string(index=False)}"

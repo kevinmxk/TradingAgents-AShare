@@ -872,6 +872,7 @@ class TushareSettingsResponse(BaseModel):
     enabled: bool
     token_configured: bool
     token_masked: Optional[str] = None
+    proxy_url: Optional[str] = None
     timeout: int
     rate_limit_per_minute: int
     cache_ttl_seconds: int
@@ -883,6 +884,7 @@ class TushareSettingsResponse(BaseModel):
 class TushareSettingsUpdateRequest(BaseModel):
     enabled: Optional[bool] = None
     token: Optional[str] = None
+    proxy_url: Optional[str] = None
     clear_token: bool = False
     timeout: Optional[int] = Field(None, ge=1, le=120)
     rate_limit_per_minute: Optional[int] = Field(None, ge=1, le=500)
@@ -892,6 +894,7 @@ class TushareSettingsUpdateRequest(BaseModel):
 
 class TushareTestRequest(BaseModel):
     token: Optional[str] = None
+    proxy_url: Optional[str] = None
 
 
 class TushareTestResponse(BaseModel):
@@ -1012,6 +1015,7 @@ def _user_config_overrides(user_id: Optional[str], db: Optional[Session] = None)
             "news_aggregate_max_chars",
             "news_dedupe_enabled",
             "tushare_enabled",
+            "tushare_proxy_url",
             "tushare_timeout",
             "tushare_rate_limit_per_minute",
             "tushare_cache_ttl_seconds",
@@ -3537,6 +3541,11 @@ def _tushare_settings_response(user_cfg: Optional[UserLLMConfigDB]) -> TushareSe
         ),
         token_configured=bool(token),
         token_masked=_mask_tushare_token(token),
+        proxy_url=(
+            getattr(user_cfg, "tushare_proxy_url", None)
+            if user_cfg and getattr(user_cfg, "tushare_proxy_url", None) is not None
+            else str(DEFAULT_CONFIG.get("tushare_proxy_url") or "").strip() or None
+        ),
         timeout=int(getattr(user_cfg, "tushare_timeout", None) or DEFAULT_CONFIG["tushare_timeout"]),
         rate_limit_per_minute=int(
             getattr(user_cfg, "tushare_rate_limit_per_minute", None)
@@ -4025,6 +4034,7 @@ def save_tushare_settings(
         current_user.id,
         tushare_enabled=request.enabled,
         tushare_token=token or None,
+        tushare_proxy_url=request.proxy_url,
         clear_tushare_token=request.clear_token,
         tushare_timeout=request.timeout,
         tushare_rate_limit_per_minute=request.rate_limit_per_minute,
@@ -4045,6 +4055,13 @@ def test_tushare_settings(
 
     user_cfg = auth_service.get_user_llm_config(db, current_user.id)
     token = (request.token or "").strip() or _tushare_token_for_user(user_cfg)
+    if "proxy_url" in request.model_fields_set:
+        proxy_url = (request.proxy_url or "").strip()
+    else:
+        proxy_url = (
+            str(getattr(user_cfg, "tushare_proxy_url", None) or "").strip()
+            or str(DEFAULT_CONFIG.get("tushare_proxy_url") or "").strip()
+        )
     if not token:
         return TushareTestResponse(
             success=False,
@@ -4057,7 +4074,12 @@ def test_tushare_settings(
         or DEFAULT_CONFIG["tushare_rate_limit_per_minute"]
     )
     timeout = int(getattr(user_cfg, "tushare_timeout", None) or DEFAULT_CONFIG["tushare_timeout"])
-    return CnTushareProvider.test_connection(token, rate_limit_per_minute=rate_limit, timeout=timeout)
+    return CnTushareProvider.test_connection(
+        token,
+        rate_limit_per_minute=rate_limit,
+        timeout=timeout,
+        proxy_url=proxy_url,
+    )
 
 
 @app.post("/settings/data-sources/tushare/probe-capabilities", response_model=TushareProbeResponse)
@@ -4070,12 +4092,21 @@ def probe_tushare_capabilities(
 
     user_cfg = auth_service.get_user_llm_config(db, current_user.id)
     token = _tushare_token_for_user(user_cfg)
+    proxy_url = (
+        str(getattr(user_cfg, "tushare_proxy_url", None) or "").strip()
+        or str(DEFAULT_CONFIG.get("tushare_proxy_url") or "").strip()
+    )
     rate_limit = int(
         getattr(user_cfg, "tushare_rate_limit_per_minute", None)
         or DEFAULT_CONFIG["tushare_rate_limit_per_minute"]
     )
     timeout = int(getattr(user_cfg, "tushare_timeout", None) or DEFAULT_CONFIG["tushare_timeout"])
-    capabilities = CnTushareProvider.probe_capabilities(token or "", rate_limit_per_minute=rate_limit, timeout=timeout)
+    capabilities = CnTushareProvider.probe_capabilities(
+        token or "",
+        rate_limit_per_minute=rate_limit,
+        timeout=timeout,
+        proxy_url=proxy_url,
+    )
     checked_at = datetime.now(timezone.utc)
     auth_service.upsert_user_llm_config(
         db,

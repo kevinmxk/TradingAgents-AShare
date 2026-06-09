@@ -215,6 +215,7 @@ class CnTushareProvider(BaseMarketDataProvider):
         return {
             "enabled": bool(self._cfg("tushare_enabled", False)),
             "token": str(self._cfg("tushare_token", "") or "").strip(),
+            "proxy_url": str(self._cfg("tushare_proxy_url", "") or "").strip(),
             "timeout": int(self._cfg("tushare_timeout", 10) or 10),
             "rate_limit_per_minute": int(self._cfg("tushare_rate_limit_per_minute", 40) or 40),
             "cache_ttl_seconds": int(self._cfg("tushare_cache_ttl_seconds", 86400) or 86400),
@@ -265,6 +266,7 @@ class CnTushareProvider(BaseMarketDataProvider):
         fields: Optional[str] = None,
         rate_limit_per_minute: int = 40,
         timeout: int = 10,
+        proxy_url: Optional[str] = None,
     ) -> pd.DataFrame:
         token = str(token or "").strip()
         if not token:
@@ -273,8 +275,9 @@ class CnTushareProvider(BaseMarketDataProvider):
         try:
             import requests
 
+            endpoint = (proxy_url or "").strip() or "http://api.tushare.pro"
             response = requests.post(
-                "http://api.tushare.pro",
+                endpoint,
                 json={
                     "api_name": api_name,
                     "token": token,
@@ -310,6 +313,7 @@ class CnTushareProvider(BaseMarketDataProvider):
         *,
         rate_limit_per_minute: int = 40,
         timeout: int = 10,
+        proxy_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         try:
             df = cls.call_api(
@@ -319,6 +323,7 @@ class CnTushareProvider(BaseMarketDataProvider):
                 fields="ts_code,trade_date,open,high,low,close,vol,amount",
                 rate_limit_per_minute=rate_limit_per_minute,
                 timeout=timeout,
+                proxy_url=proxy_url,
             )
             return {
                 "success": not df.empty,
@@ -341,6 +346,7 @@ class CnTushareProvider(BaseMarketDataProvider):
         *,
         rate_limit_per_minute: int = 40,
         timeout: int = 10,
+        proxy_url: Optional[str] = None,
     ) -> Dict[str, str]:
         if not str(token or "").strip():
             result = {name: "not_configured" for name in cls.PROBE_SPECS}
@@ -355,6 +361,7 @@ class CnTushareProvider(BaseMarketDataProvider):
                         fields=spec["fields"],
                         rate_limit_per_minute=rate_limit_per_minute,
                         timeout=timeout,
+                        proxy_url=proxy_url,
                     )
                     result[api_name] = "available" if not df.empty else "empty_result"
                 except TushareProviderError as exc:
@@ -365,8 +372,14 @@ class CnTushareProvider(BaseMarketDataProvider):
         return result
 
     def _cached_api(self, api_name: str, params: Dict[str, Any], fields: str, ttl: int, rate_limit: int) -> pd.DataFrame:
+        settings = self._ensure_available(api_name)
         cache_key = json.dumps(
-            {"api": api_name, "params": params, "fields": fields},
+            {
+                "api": api_name,
+                "params": params,
+                "fields": fields,
+                "proxy_url": settings.get("proxy_url") or "",
+            },
             sort_keys=True,
             ensure_ascii=False,
         )
@@ -374,7 +387,6 @@ class CnTushareProvider(BaseMarketDataProvider):
         cached = self._cache.get(cache_key)
         if cached and now - cached[0] < ttl:
             return cached[1].copy()
-        settings = self._ensure_available(api_name)
         try:
             df = self.call_api(
                 settings["token"],
@@ -382,7 +394,8 @@ class CnTushareProvider(BaseMarketDataProvider):
                 params=params,
                 fields=fields,
                 rate_limit_per_minute=rate_limit,
-                timeout=int(self._settings()["timeout"]),
+                timeout=int(settings["timeout"]),
+                proxy_url=str(settings.get("proxy_url") or ""),
             )
         except TushareProviderError as exc:
             raise NotImplementedError(f"cn_tushare {api_name} unavailable: {exc.status}") from exc

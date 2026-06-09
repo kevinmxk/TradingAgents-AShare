@@ -52,6 +52,7 @@ DEFAULT_CONFIG = {
     # User-saved frontend settings override these environment values at runtime.
     "tushare_enabled": os.getenv("TUSHARE_ENABLED", "false").lower() in ("1", "true", "yes", "on"),
     "tushare_token": os.getenv("TUSHARE_TOKEN", ""),
+    "tushare_proxy_url": os.getenv("TUSHARE_PROXY_URL", ""),
     "tushare_timeout": int(os.getenv("TUSHARE_TIMEOUT", "10")),
     "tushare_rate_limit_per_minute": int(os.getenv("TUSHARE_RATE_LIMIT_PER_MINUTE", "40")),
     "tushare_cache_ttl_seconds": int(os.getenv("TUSHARE_CACHE_TTL_SECONDS", "86400")),
@@ -61,10 +62,11 @@ DEFAULT_CONFIG = {
     
     # Data vendor configuration
     "data_vendors": {
-        "core_stock_apis": "cn_akshare,cn_baostock,yfinance",
-        "technical_indicators": "cn_akshare,cn_baostock,yfinance",
-        "fundamental_data": "cn_akshare,cn_baostock,yfinance",
-        "news_data": "cn_searxng,cn_akshare,yfinance",
+        "core_stock_apis": "cn_tushare,cn_akshare,cn_baostock,yfinance",
+        "technical_indicators": "cn_tushare,cn_akshare,cn_baostock,yfinance",
+        "fundamental_data": "cn_tushare,cn_akshare,cn_baostock,yfinance",
+        "news_data": "cn_searxng,cn_tushare,cn_akshare,yfinance",
+        "cn_market_data": "cn_tushare,cn_akshare",
         "realtime_data": "cn_akshare",
     },
     "tool_vendors": {},

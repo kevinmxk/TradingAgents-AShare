@@ -259,6 +259,7 @@ def upsert_user_llm_config(
     news_dedupe_enabled: Optional[bool] = None,
     tushare_enabled: Optional[bool] = None,
     tushare_token: Optional[str] = None,
+    tushare_proxy_url: Optional[str] = None,
     tushare_timeout: Optional[int] = None,
     tushare_rate_limit_per_minute: Optional[int] = None,
     tushare_cache_ttl_seconds: Optional[int] = None,
@@ -306,6 +307,8 @@ def upsert_user_llm_config(
         row.news_dedupe_enabled = bool(news_dedupe_enabled)
     if tushare_enabled is not None:
         row.tushare_enabled = bool(tushare_enabled)
+    if tushare_proxy_url is not None:
+        row.tushare_proxy_url = tushare_proxy_url.strip() or None
     if tushare_timeout is not None:
         row.tushare_timeout = int(tushare_timeout)
     if tushare_rate_limit_per_minute is not None:
