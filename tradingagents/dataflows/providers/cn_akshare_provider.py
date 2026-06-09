@@ -903,11 +903,18 @@ class CnAkshareProvider(BaseMarketDataProvider):
             ak = self._ak()
             code = self._normalize_symbol(symbol)
             date_yyyymmdd = date.replace("-", "")
+            # stock_lhb_stock_detail_em 在 akshare 1.18.x 中当个股无数据时会崩溃
+            # 改用 stock_lhb_detail_em 获取全市场数据后按代码过滤
             with AKSHARE_CALL_LOCK:
-                df = ak.stock_lhb_stock_detail_em(symbol=code, date=date_yyyymmdd, flag="买入")
+                df = ak.stock_lhb_detail_em(start_date=date_yyyymmdd, end_date=date_yyyymmdd)
             if df is None or df.empty:
                 return f"{symbol} 在 {date} 无龙虎榜数据（非异动日属正常）。"
-            return f"{symbol} 龙虎榜明细（{date}）：\n{df.head(20).to_string(index=False)}"
+            # 过滤出目标个股的龙虎榜数据
+            code_int = code.lstrip("0")  # 部分 akshare 返回的代码可能不带前导零
+            stock_df = df[df["代码"].astype(str).str.strip().str.lstrip("0") == code_int]
+            if stock_df is None or stock_df.empty:
+                return f"{symbol} 在 {date} 无龙虎榜数据（非异动日属正常）。"
+            return f"{symbol} 龙虎榜明细（{date}）：\n{stock_df.head(20).to_string(index=False)}"
         except Exception as exc:
             return f"龙虎榜数据获取失败：{type(exc).__name__}: {exc}"
 
