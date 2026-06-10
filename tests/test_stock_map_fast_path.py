@@ -28,3 +28,21 @@ def test_reverse_stock_map_cached_only_uses_existing_cache():
         }
     finally:
         main_mod._cn_stock_map = original_map
+
+
+def test_normalize_symbol_uses_cached_chinese_name_before_slow_load():
+    from api import main as main_mod
+
+    original_map = main_mod._cn_stock_map
+    try:
+        main_mod._cn_stock_map = {"三花智控": "002050.SZ"}
+        with patch.object(main_mod, "_load_cn_stock_map", side_effect=AssertionError("slow load should not run")):
+            assert main_mod._normalize_symbol("三花智控") == "002050.SZ"
+    finally:
+        main_mod._cn_stock_map = original_map
+
+
+def test_normalize_symbol_keeps_us_ticker():
+    from api import main as main_mod
+
+    assert main_mod._normalize_symbol("TSLA") == "TSLA"

@@ -130,6 +130,7 @@ def route_to_vendor(method: str, *args, **kwargs):
     fallback_vendors = _resolve_vendor_chain(method, vendor_config)
     args_summary = _summarize_args(args, kwargs)
     last_exc = None
+    provider_errors = []
     _trace(
         f"method={method} {args_summary} category={category} "
         f"configured='{vendor_config}' chain={fallback_vendors}"
@@ -139,11 +140,13 @@ def route_to_vendor(method: str, *args, **kwargs):
         provider = _registry.get(vendor)
         if provider is None:
             _trace(f"method={method} {args_summary} vendor={vendor} status=skip reason=not-registered")
+            provider_errors.append(f"{vendor}: not-registered")
             continue
 
         impl_func = getattr(provider, method, None)
         if impl_func is None:
             _trace(f"method={method} {args_summary} vendor={vendor} status=skip reason=not-implemented")
+            provider_errors.append(f"{vendor}: not-implemented")
             continue
 
         try:
@@ -157,6 +160,7 @@ def route_to_vendor(method: str, *args, **kwargs):
                 f"method={method} {args_summary} vendor={vendor} status=fallback "
                 f"reason={type(exc).__name__}: {exc}"
             )
+            provider_errors.append(f"{vendor}: {type(exc).__name__}: {exc}")
             continue
         except Exception as exc:
             # Provider-specific runtime/parsing errors (e.g., schema changes, KeyError)
@@ -166,18 +170,22 @@ def route_to_vendor(method: str, *args, **kwargs):
                 f"method={method} {args_summary} vendor={vendor} status=fallback "
                 f"reason={type(exc).__name__}: {exc}"
             )
+            provider_errors.append(f"{vendor}: {type(exc).__name__}: {exc}")
             continue
 
     _trace(f"method={method} {args_summary} status=failed reason=no-available-vendor")
+    detail = f" Provider errors: {' | '.join(provider_errors)}" if provider_errors else ""
     if last_exc is not None:
         raise RuntimeError(
             f"No available vendor for method '{method}'. "
             f"Configured chain: {fallback_vendors}. "
-            f"Last error: {type(last_exc).__name__}: {last_exc}"
+            f"Last error: {type(last_exc).__name__}: {last_exc}."
+            f"{detail}"
         ) from last_exc
     raise RuntimeError(
         f"No available vendor for method '{method}'. "
-        f"Configured chain: {fallback_vendors}"
+        f"Configured chain: {fallback_vendors}."
+        f"{detail}"
     )
 
 

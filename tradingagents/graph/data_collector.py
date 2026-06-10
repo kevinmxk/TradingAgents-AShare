@@ -37,6 +37,54 @@ LONG_DAYS = 90
 import numpy as np
 
 _OHLCV_COLS = ["date", "open", "high", "low", "close", "volume"]
+_OHLCV_COLUMN_ALIASES = {
+    "date": "date",
+    "datetime": "date",
+    "trade_date": "date",
+    "\u65e5\u671f": "date",
+    "\u4ea4\u6613\u65e5\u671f": "date",
+    "open": "open",
+    "\u5f00\u76d8": "open",
+    "\u4eca\u5f00": "open",
+    "high": "high",
+    "\u6700\u9ad8": "high",
+    "low": "low",
+    "\u6700\u4f4e": "low",
+    "close": "close",
+    "\u6536\u76d8": "close",
+    "\u6700\u65b0\u4ef7": "close",
+    "volume": "volume",
+    "vol": "volume",
+    "\u6210\u4ea4\u91cf": "volume",
+}
+
+
+def _normalize_ohlcv_columns(df: pd.DataFrame) -> pd.DataFrame:
+    rename_dict = {}
+    seen_targets = set()
+    for column in df.columns:
+        normalized = str(column).strip()
+        key = normalized.lower().replace(" ", "_")
+        target = _OHLCV_COLUMN_ALIASES.get(key) or _OHLCV_COLUMN_ALIASES.get(normalized)
+        if target and target not in seen_targets:
+            rename_dict[column] = target
+            seen_targets.add(target)
+    return df.rename(columns=rename_dict)
+
+
+def _stock_data_parse_issue(raw_csv: str, df: Optional[pd.DataFrame] = None) -> str:
+    if not isinstance(raw_csv, str) or not raw_csv.strip():
+        return "stock_data is empty or not a CSV string"
+    if len(raw_csv) <= 50:
+        return "stock_data is too short to contain OHLCV rows"
+    if df is None:
+        return "stock_data CSV could not be parsed"
+    missing = [col for col in _OHLCV_COLS if col not in df.columns]
+    if missing:
+        return f"stock_data CSV missing normalized OHLCV columns: {missing}; columns={list(df.columns)}"
+    if df.empty:
+        return "stock_data CSV has no usable OHLCV rows after type conversion"
+    return ""
 
 
 def _parse_csv_to_dataframe(raw_csv: str) -> Optional[pd.DataFrame]:
@@ -52,12 +100,16 @@ def _parse_csv_to_dataframe(raw_csv: str) -> Optional[pd.DataFrame]:
         return None
     if df.empty:
         return None
-    cols_map = {c.lower(): c for c in df.columns}
-    rename_dict = {}
-    for target in _OHLCV_COLS:
-        if target in cols_map:
-            rename_dict[cols_map[target]] = target
-    df = df.rename(columns=rename_dict)
+    df = _normalize_ohlcv_columns(df)
+    if not set(_OHLCV_COLS).issubset(df.columns):
+        return None
+    df = df[_OHLCV_COLS].copy()
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    for col in ["open", "high", "low", "close", "volume"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=_OHLCV_COLS).sort_values("date").reset_index(drop=True)
+    if df.empty:
+        return None
     return df
 
 
@@ -298,6 +350,17 @@ def _fetch_all(ticker: str, trade_date: str) -> Dict[str, Any]:
     # ── Parse CSV once, reuse for indicators and VPA ──────────────────
     raw_csv = results.get("stock_data", "")
     df = _parse_csv_to_dataframe(raw_csv)
+    if df is None:
+        try:
+            parsed = pd.read_csv(io.StringIO(raw_csv), on_bad_lines='skip', comment='#') if isinstance(raw_csv, str) else None
+            if parsed is not None and not parsed.empty:
+                parsed = _normalize_ohlcv_columns(parsed)
+            parse_issue = _stock_data_parse_issue(raw_csv, parsed)
+        except Exception as exc:
+            parse_issue = f"stock_data CSV parse failed: {type(exc).__name__}: {exc}"
+        results["data_quality"] = {"stock_data": parse_issue}
+    else:
+        results["data_quality"] = {"stock_data": f"ok ({len(df)} OHLCV rows)"}
 
     # ── 核心加速：本地计算所有技术指标 ──────────────────
     indicators_res = {}
@@ -325,7 +388,7 @@ def _fetch_all(ticker: str, trade_date: str) -> Dict[str, Any]:
                 except Exception:
                     indicators_res[key] = "N/A"
         else:
-            print(f"  [Warning] No valid stock_data for indicator calculation.")
+            print(f"  [Warning] No valid stock_data for indicator calculation: {results['data_quality']['stock_data']}")
     except Exception as e:
         print(f"  [Error] Local indicator calculation failed: {e}")
 
@@ -340,7 +403,7 @@ def _fetch_all(ticker: str, trade_date: str) -> Dict[str, Any]:
         if df is not None:
             results["vpa_indicators"] = _compute_vpa_indicators(df.copy())
         else:
-            results["vpa_indicators"] = "VPA 数据不足"
+            results["vpa_indicators"] = f"VPA data unavailable: {results['data_quality']['stock_data']}"
     except Exception as e:
         results["vpa_indicators"] = f"VPA 计算失败：{e}"
 

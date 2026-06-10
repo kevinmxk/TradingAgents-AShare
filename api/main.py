@@ -2316,7 +2316,15 @@ async def _run_job_inner(
 
 
 def _normalize_symbol(raw: str) -> str:
-    s = raw.strip().upper()
+    original = str(raw or "").strip()
+    if not original:
+        return ""
+
+    cached_map = _cn_stock_map or {}
+    if original in cached_map:
+        return cached_map[original]
+
+    s = original.upper()
     # Priority: 6-digit CN stock code
     m = re.search(r"(\d{6})(?:\.(SH|SZ|SS))?", s)
     if m:
@@ -2334,9 +2342,14 @@ def _normalize_symbol(raw: str) -> str:
         return m2.group(1)
         
     # Final Fallback: Check Chinese Name Map (e.g. "三花智控" -> "002050.SZ")
-    stock_map = _load_cn_stock_map()
-    if s in stock_map:
-        return stock_map[s]
+    try:
+        stock_map = _load_cn_stock_map()
+        if original in stock_map:
+            return stock_map[original]
+        if s in stock_map:
+            return stock_map[s]
+    except Exception as exc:
+        _log(f"[StockMap] Symbol name lookup failed for {original!r}: {exc}")
         
     return s
 
@@ -2382,11 +2395,32 @@ def _parse_stock_csv(raw: str) -> List[Dict[str, Any]]:
     except Exception:
         return []
 
+    rename_map = {
+        k: {
+            "date": "Date",
+            "datetime": "Date",
+            "trade_date": "Date",
+            "\u65e5\u671f": "Date",
+            "\u4ea4\u6613\u65e5\u671f": "Date",
+            "open": "Open",
+            "\u5f00\u76d8": "Open",
+            "\u4eca\u5f00": "Open",
+            "high": "High",
+            "\u6700\u9ad8": "High",
+            "low": "Low",
+            "\u6700\u4f4e": "Low",
+            "close": "Close",
+            "\u6536\u76d8": "Close",
+            "\u6700\u65b0\u4ef7": "Close",
+            "volume": "Volume",
+            "vol": "Volume",
+            "\u6210\u4ea4\u91cf": "Volume",
+        }.get(str(k).strip().lower().replace(" ", "_"), str(k).strip())
+        for k in df.columns
+    }
+    df = df.rename(columns=rename_map)
     if "Date" not in df.columns:
         return []
-
-    rename_map = {k: k.strip() for k in df.columns}
-    df = df.rename(columns=rename_map)
     required = ["Date", "Open", "High", "Low", "Close"]
     for col in required:
         if col not in df.columns:

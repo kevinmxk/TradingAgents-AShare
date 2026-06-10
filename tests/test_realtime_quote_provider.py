@@ -53,3 +53,40 @@ def test_route_to_vendor_resolves_realtime_quotes():
     from tradingagents.dataflows.interface import get_category_for_method
     category = get_category_for_method("get_realtime_quotes")
     assert category == "realtime_data"
+
+
+def test_route_to_vendor_reports_all_provider_failures(monkeypatch):
+    from tradingagents.dataflows import interface
+
+    class ProviderA:
+        name = "provider_a"
+
+        def get_stock_data(self, symbol, start_date, end_date):
+            raise NotImplementedError("unsupported")
+
+    class ProviderB:
+        name = "provider_b"
+
+        def get_stock_data(self, symbol, start_date, end_date):
+            raise ValueError("schema changed")
+
+    class Registry:
+        def __init__(self):
+            self.providers = {"provider_a": ProviderA(), "provider_b": ProviderB()}
+
+        def list_names(self):
+            return list(self.providers)
+
+        def get(self, name):
+            return self.providers.get(name)
+
+    monkeypatch.setattr(interface, "_registry", Registry())
+    monkeypatch.setattr(interface, "get_vendor", lambda category, method=None: "provider_a,provider_b")
+    monkeypatch.setattr(interface, "_is_trace_enabled", lambda: False)
+
+    with pytest.raises(RuntimeError) as exc:
+        interface.route_to_vendor("get_stock_data", "600519.SH", "2026-03-01", "2026-03-10")
+
+    message = str(exc.value)
+    assert "provider_a: NotImplementedError: unsupported" in message
+    assert "provider_b: ValueError: schema changed" in message
