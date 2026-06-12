@@ -388,7 +388,13 @@ function SimpleBoardView({
 }) {
     return (
         <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-            <div className="overflow-x-auto">
+            <div className="space-y-3 p-3 md:hidden">
+                {items.map(item => (
+                    <SimpleTrackingCard key={item.symbol} item={item} />
+                ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
                 <div className="min-w-[1180px]">
                     <div className="grid grid-cols-[1.36fr_0.88fr_0.74fr_0.78fr_1.28fr_0.86fr_0.96fr] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-medium tracking-[0.12em] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
                         <div>标的</div>
@@ -416,6 +422,73 @@ function SimpleBoardView({
                     {trackingRefreshing && <RefreshCw className="h-3.5 w-3.5 animate-spin text-slate-400" />}
                 </div>
                 <div className="text-slate-400">更新：{formatFooterTime(lastQuoteTime)}</div>
+            </div>
+        </div>
+    )
+}
+
+function SimpleTrackingCard({ item }: { item: TrackingBoardItem }) {
+    const priceChangePct = item.price_change_pct ?? null
+    const isUp = (priceChangePct ?? 0) >= 0
+    const holdingChangePct = item.floating_pnl_pct ?? null
+    const priceColor = priceChangePct == null
+        ? 'text-slate-800 dark:text-slate-200'
+        : isUp
+            ? 'text-rose-600 dark:text-rose-400'
+            : 'text-emerald-600 dark:text-emerald-400'
+    const rangeAlert = getModelRangeAlert(item)
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/45">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <div className="truncate text-lg font-semibold text-slate-900 dark:text-slate-100">{item.name}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <span>{item.symbol}</span>
+                        <span>鎴愭湰 {formatPlainPrice(item.average_cost)}</span>
+                        <span>鎸佷粨 {formatShares(item.current_position)}</span>
+                    </div>
+                </div>
+                <div className="shrink-0 text-right">
+                    <div className={`text-xl font-semibold ${priceColor}`}>{formatPlainPrice(item.live_price)}</div>
+                    <div className={`mt-1 rounded-full px-2 py-1 text-xs font-semibold ${
+                        priceChangePct == null
+                            ? 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500'
+                            : isUp
+                                ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'
+                                : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+                    }`}>
+                        {formatSignedPercent(priceChangePct)}
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-4">
+                <SimpleDayCandle item={item} />
+            </div>
+
+            <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-3">
+                    <span className="w-14 text-right text-xs text-slate-400">{formatPlainPrice(item.day_low)}</span>
+                    <SimpleRangeTrack item={item} />
+                    <span className="w-14 text-xs text-slate-400">{formatPlainPrice(item.day_high)}</span>
+                </div>
+                {rangeAlert && (
+                    <div className={`rounded-xl border px-3 py-2 text-xs font-medium ${
+                        rangeAlert.tone === 'danger'
+                            ? 'border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-500/20 dark:bg-rose-500/10'
+                            : 'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-500/20 dark:bg-amber-500/10'
+                    }`}>
+                        {rangeAlert.message}
+                    </div>
+                )}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <MetricPill label="持仓盈亏%" value={formatSignedPercent(holdingChangePct)} />
+                <MetricPill label="成交额" value={formatAmount(item.amount)} />
+                <MetricPill label="模型低位" value={formatPlainPrice(item.analysis?.low_price)} />
+                <MetricPill label="模型高位" value={formatPlainPrice(item.analysis?.high_price)} />
             </div>
         </div>
     )

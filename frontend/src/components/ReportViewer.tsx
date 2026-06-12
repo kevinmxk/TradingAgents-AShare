@@ -24,7 +24,9 @@ const REPORT_DISCLAIMER =
 
 const MD_COMPONENTS = {
     table: ({ children }: { children?: React.ReactNode }) => (
-        <table className="w-full border-collapse border border-slate-300 dark:border-slate-600 my-4">{children}</table>
+        <div className="my-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+            <table className="min-w-full border-collapse border border-slate-300 text-sm dark:border-slate-600">{children}</table>
+        </div>
     ),
     thead: ({ children }: { children?: React.ReactNode }) => (
         <thead className="bg-slate-100 dark:bg-slate-700">{children}</thead>
@@ -147,8 +149,8 @@ export default function ReportViewer({ reportData, activeSection }: ReportViewer
                                     <span className="text-xs text-green-500">✓</span>
                                 </button>
                                 {isExpanded && (
-                                    <div className="p-5 bg-white dark:bg-slate-800/30">
-                                        <div className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
+                                    <div className="bg-white p-4 dark:bg-slate-800/30 sm:p-5">
+                                        <div className="prose prose-sm max-w-none overflow-hidden break-words leading-7 dark:prose-invert md:prose-base">
                                             <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>{content}</ReactMarkdown>
                                         </div>
                                     </div>
@@ -172,7 +174,7 @@ export default function ReportViewer({ reportData, activeSection }: ReportViewer
     return (
         <div className="card flex-1 flex flex-col min-h-0 ring-1 ring-slate-200/70 dark:ring-slate-800 shadow-[0_16px_40px_rgba(15,23,42,0.06)] dark:shadow-none">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                     <FileText className="w-5 h-5 text-blue-500" />
                     <div>
@@ -194,7 +196,7 @@ export default function ReportViewer({ reportData, activeSection }: ReportViewer
                     )}
                 </div>
                 {hasAnyContent && (
-                    <button onClick={handleExport} className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3">
+                    <button onClick={handleExport} className="btn-secondary flex min-h-[44px] items-center justify-center gap-2 px-3 py-1.5 text-sm sm:min-h-0">
                         <Download className="w-4 h-4" />
                         导出全部
                     </button>
@@ -221,9 +223,9 @@ export default function ReportViewer({ reportData, activeSection }: ReportViewer
                     /* Single section content */
                     <div className="space-y-4">
                         <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-900/40">
-                            <div className="p-5 bg-white dark:bg-slate-800/30">
+                            <div className="bg-white p-4 dark:bg-slate-800/30 sm:p-5">
                                 {activeContent ? (
-                                    <div className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
+                                    <div className="prose prose-sm max-w-none overflow-hidden break-words leading-7 dark:prose-invert md:prose-base">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
                                             {activeContent}
                                         </ReactMarkdown>

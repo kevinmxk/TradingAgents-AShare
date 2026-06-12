@@ -631,7 +631,7 @@ export default function Settings() {
                                     使用当前表单配置向模型发送“你好”，不会自动保存设置。
                                 </p>
                             </div>
-                            <button onClick={handleWarmup} disabled={saving || saveAllSaving || warmingUp || configLoading} className="btn-secondary inline-flex items-center gap-2">
+                            <button onClick={handleWarmup} disabled={saving || saveAllSaving || warmingUp || configLoading} className="btn-secondary inline-flex min-h-[44px] items-center justify-center gap-2 sm:min-h-0">
                                 {warmingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flame className="w-4 h-4" />}
                                 {warmingUp ? '测试中...' : '测试连接'}
                             </button>
@@ -693,7 +693,7 @@ export default function Settings() {
                             type="button"
                             onClick={handleSearxngTest}
                             disabled={configLoading || searxngTesting}
-                            className="btn-secondary inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                            className="btn-secondary inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap sm:min-h-0"
                         >
                             {searxngTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flame className="w-4 h-4" />}
                             {searxngTesting ? '测试中...' : '测试连接'}
@@ -926,12 +926,12 @@ export default function Settings() {
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <button
                         type="button"
                         onClick={handleSaveTushare}
                         disabled={configLoading || tushareSaving}
-                        className="btn-primary inline-flex items-center gap-2"
+                        className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2"
                     >
                         {tushareSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         保存 Tushare
@@ -940,7 +940,7 @@ export default function Settings() {
                         type="button"
                         onClick={handleTestTushare}
                         disabled={configLoading || tushareTesting || (!tushareToken.trim() && !tushareSettings?.token_configured)}
-                        className="btn-secondary inline-flex items-center gap-2"
+                        className="btn-secondary inline-flex min-h-[44px] items-center justify-center gap-2"
                     >
                         {tushareTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Flame className="w-4 h-4" />}
                         测试连接
@@ -949,7 +949,7 @@ export default function Settings() {
                         type="button"
                         onClick={handleProbeTushare}
                         disabled={configLoading || tushareProbing || !tushareSettings?.token_configured}
-                        className="btn-secondary inline-flex items-center gap-2"
+                        className="btn-secondary inline-flex min-h-[44px] items-center justify-center gap-2"
                     >
                         {tushareProbing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
                         检测权限
@@ -1004,7 +1004,7 @@ export default function Settings() {
                     <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
                         默认启用分析师
                     </label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                         {[
                             { key: 'market', label: '市场分析' },
                             { key: 'social', label: '舆情分析' },
@@ -1033,7 +1033,7 @@ export default function Settings() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
                             辩论轮数上限
@@ -1142,7 +1142,7 @@ export default function Settings() {
                 </div>
 
                 {/* Create Token Form */}
-                    <form onSubmit={handleCreateToken} className="flex items-center gap-2 pt-2">
+                    <form onSubmit={handleCreateToken} className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center">
                         <input
                             type="text"
                             value={newTokenName}
@@ -1154,7 +1154,7 @@ export default function Settings() {
                     <button
                         type="submit"
                         disabled={isCreatingToken || !newTokenName.trim() || tokens.length >= 10}
-                        className="btn-primary h-10 px-4 flex items-center gap-2 whitespace-nowrap text-sm"
+                        className="btn-primary flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap px-4 text-sm sm:h-10 sm:min-h-0"
                     >
                         {isCreatingToken ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                         生成 Token
@@ -1173,7 +1173,7 @@ export default function Settings() {
 
                 {/* 邮件推送 */}
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-slate-700/80 dark:bg-slate-900/40">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-4">
                         <div>
                             <div className="text-sm font-medium text-slate-700 dark:text-slate-200">邮件推送</div>
                             <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">定时分析完成时发送至 {user?.email || '-'}</div>
@@ -1193,7 +1193,7 @@ export default function Settings() {
 
                 {/* 企业微信 Webhook */}
                 <div className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 space-y-3 dark:border-slate-700/80 dark:bg-slate-900/40">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-4">
                         <div>
                             <div className="text-sm font-medium text-slate-700 dark:text-slate-200">企业微信 Webhook</div>
                             <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
@@ -1213,7 +1213,7 @@ export default function Settings() {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <div className="relative flex-1">
                             <Webhook className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input
@@ -1229,7 +1229,7 @@ export default function Settings() {
                             type="button"
                             onClick={handleWecomWarmup}
                             disabled={configLoading || saving || saveAllSaving || wecomWarmingUp || (!wecomWebhook.trim() && !hasStoredWebhook)}
-                            className="btn-secondary inline-flex items-center gap-1.5 text-xs shrink-0"
+                            className="btn-secondary inline-flex min-h-[44px] items-center justify-center gap-1.5 text-xs sm:min-h-0 sm:shrink-0"
                         >
                             {wecomWarmingUp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Flame className="w-3.5 h-3.5" />}
                             {wecomWarmingUp ? '发送中...' : '测试连接'}
@@ -1239,7 +1239,7 @@ export default function Settings() {
                                 type="button"
                                 onClick={handleClearWebhook}
                                 disabled={saving || saveAllSaving}
-                                className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-rose-500 disabled:opacity-50 shrink-0"
+                                className="inline-flex min-h-[44px] items-center justify-center gap-1 text-xs text-slate-400 hover:text-rose-500 disabled:opacity-50 sm:min-h-0 sm:shrink-0"
                             >
                                 <Trash2 className="w-3 h-3" />
                                 清除
@@ -1260,8 +1260,8 @@ export default function Settings() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-4">
-                <button onClick={handleSaveAll} disabled={saveAllSaving} className="btn-primary inline-flex items-center gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                <button onClick={handleSaveAll} disabled={saveAllSaving} className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2">
                     {saveAllSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     保存全部
                 </button>

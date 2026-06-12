@@ -1,12 +1,20 @@
 import { ReactNode } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import MobileLayout from '@/layouts/MobileLayout'
+import { useResponsive } from '@/hooks/useResponsive'
 
 interface LayoutProps {
     children: ReactNode
 }
 
 export default function Layout({ children }: LayoutProps) {
+    const { isMobile } = useResponsive()
+
+    if (isMobile) {
+        return <MobileLayout>{children}</MobileLayout>
+    }
+
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
             <Sidebar />

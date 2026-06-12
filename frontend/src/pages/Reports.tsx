@@ -427,14 +427,14 @@ export default function Reports() {
                     />
                 )}
                 {/* 返回按钮 + 标题 */}
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
 
                     <button
                         onClick={() => {
                             setSelectedReport(null)
                             setSearchParams({})
                         }}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 sm:min-h-0"
                     >
                         <ChevronLeft className="w-4 h-4" />
                         返回列表
@@ -447,7 +447,7 @@ export default function Reports() {
                     </h1>
                     <button
                         onClick={() => exportReport(selectedReport)}
-                        className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-sm text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 sm:ml-auto sm:min-h-0"
                     >
                         <Download className="w-4 h-4" />
                         导出 Markdown
@@ -455,7 +455,7 @@ export default function Reports() {
                 </div>
 
                 {/* 元信息 */}
-                <div className="flex items-center gap-4 text-sm text-slate-500">
+                <div className="flex flex-col gap-1 text-sm text-slate-500 sm:flex-row sm:items-center sm:gap-4">
                     <span>分析日期：{selectedReport.trade_date}</span>
                     <span>生成时间：{selectedReport.created_at ? new Date(selectedReport.created_at).toLocaleString('zh-CN') : '-'}</span>
                 </div>
@@ -580,7 +580,79 @@ export default function Reports() {
             {/* 报告表格 */}
             {!loading && !error && (
                 <div className="card overflow-hidden">
-                    <div className="overflow-x-auto">
+                    <div className="space-y-3 md:hidden">
+                        {filteredReports.map((report) => (
+                            <button
+                                key={report.id}
+                                type="button"
+                                onClick={() => handleSelectReport(report)}
+                                className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left transition-colors active:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50 dark:active:bg-slate-800/70"
+                            >
+                                <div className="flex items-start gap-3">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-500/10">
+                                        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{report.name || report.symbol}</p>
+                                                {report.name && report.name !== report.symbol && (
+                                                    <p className="mt-0.5 text-xs text-slate-400">{report.symbol}</p>
+                                                )}
+                                            </div>
+                                            <div className="shrink-0 text-right text-sm">
+                                                {renderStatusBadge(report)}
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500 dark:text-slate-400">
+                                            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/70">
+                                                <div className="text-slate-400">Trade date</div>
+                                                <div className="mt-1 font-medium text-slate-700 dark:text-slate-200">{report.trade_date}</div>
+                                            </div>
+                                            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/70">
+                                                <div className="text-slate-400">Confidence</div>
+                                                <div className="mt-1 font-medium text-slate-700 dark:text-slate-200">{report.confidence != null ? `${report.confidence}%` : '-'}</div>
+                                            </div>
+                                            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/70">
+                                                <div className="text-slate-400">Target / Stop</div>
+                                                <div className="mt-1 font-medium text-slate-700 dark:text-slate-200">
+                                                    {report.target_price != null ? `¥${report.target_price}` : '-'} / {report.stop_loss_price != null ? `¥${report.stop_loss_price}` : '-'}
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/70">
+                                                <div className="text-slate-400">Created</div>
+                                                <div className="mt-1 font-medium text-slate-700 dark:text-slate-200">
+                                                    {report.created_at ? new Date(report.created_at).toLocaleDateString('zh-CN') : '-'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center justify-end gap-2">
+                                            <span className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+                                                详情
+                                            </span>
+                                            <span
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={e => handleDelete(e as unknown as React.MouseEvent, report.id)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        handleDelete(e as unknown as React.MouseEvent, report.id)
+                                                    }
+                                                }}
+                                                className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-medium text-rose-500 dark:bg-slate-800"
+                                            >
+                                                {deleting === report.id ? '删除中' : '删除'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="hidden overflow-x-auto md:block">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-slate-200 dark:border-slate-700">

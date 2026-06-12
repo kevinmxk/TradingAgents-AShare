@@ -492,7 +492,7 @@ export default function Portfolio() {
                             <h2 className="font-semibold text-slate-900 dark:text-slate-100">添加自选</h2>
                         </div>
                         <div className="space-y-3" ref={dropdownRef}>
-                            <div className="relative flex items-center gap-2">
+                            <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                     <input
@@ -526,7 +526,7 @@ export default function Portfolio() {
                                     type="button"
                                     onClick={submitWatchlistInput}
                                     disabled={!trimmedQuery || addingWatchlist}
-                                    className="btn-primary inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+                                    className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap sm:shrink-0"
                                 >
                                     {addingWatchlist ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                                     {isBatchInput ? '批量添加' : '添加'}
@@ -589,7 +589,7 @@ export default function Portfolio() {
                                 {watchlist.map(item => {
                                     const report = latestReports[item.symbol]
                                     return (
-                                        <div key={item.id} className="flex items-center gap-3 py-3">
+                                        <div key={item.id} className="flex flex-wrap items-center gap-3 py-3">
                                             <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
                                                 <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                             </div>
@@ -605,7 +605,7 @@ export default function Portfolio() {
                                             {/* Schedule toggle */}
                                             <button
                                                 onClick={() => toggleScheduled(item.symbol, item.has_scheduled)}
-                                                className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
+                                                className={`flex min-h-[36px] items-center gap-1 rounded-lg px-3 py-1 text-xs transition-colors ${
                                                     item.has_scheduled
                                                         ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
                                                         : 'bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600'
@@ -618,7 +618,7 @@ export default function Portfolio() {
                                             {/* Analyze */}
                                             <button
                                                 onClick={() => navigate(`/analysis?symbol=${item.symbol}`)}
-                                                className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                                                className="flex min-h-[36px] items-center gap-1 rounded-lg bg-blue-50 px-3 py-1 text-xs text-blue-600 transition-colors hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20"
                                             >
                                                 <Activity className="w-3 h-3" />
                                                 分析
@@ -626,7 +626,7 @@ export default function Portfolio() {
                                             {/* Delete */}
                                             <button
                                                 onClick={() => removeFromWatchlist(item.id)}
-                                                className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
+                                                className="min-h-[36px] rounded-lg px-2 text-slate-400 transition-colors hover:text-red-500"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
@@ -691,7 +691,7 @@ export default function Portfolio() {
                                 </>
                             )}
 
-                            <div className="ml-auto inline-flex items-center gap-1.5">
+                            <div className="inline-flex flex-wrap items-center gap-1.5 sm:ml-auto">
                                 {hasSelectedScheduled && (
                                     <>
                                         <button
@@ -752,7 +752,7 @@ export default function Portfolio() {
                                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/60'
                                     }`}
                                 >
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex flex-wrap items-center gap-3">
                                         <input
                                             type="checkbox"
                                             checked={selectedScheduledIdSet.has(task.id)}
@@ -819,7 +819,7 @@ export default function Portfolio() {
                                             value={task.trigger_time}
                                             onChange={e => updateScheduledTime(task.id, e.target.value)}
                                             disabled={isScheduledBatchBusy}
-                                            className="w-[90px] text-sm px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent text-slate-700 dark:text-slate-200"
+                                            className="h-9 w-[96px] rounded-lg border border-slate-300 bg-transparent px-2 text-sm text-slate-700 dark:border-slate-600 dark:text-slate-200"
                                         />
 
                                         {/* Active toggle */}
@@ -827,12 +827,12 @@ export default function Portfolio() {
                                             type="button"
                                             onClick={() => toggleScheduledActive(task.id, !task.is_active)}
                                             disabled={isScheduledBatchBusy}
-                                            className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+                                            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
                                                 task.is_active ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
                                             }`}
                                         >
-                                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                                task.is_active ? 'translate-x-4' : 'translate-x-0.5'
+                                            <div className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                                                task.is_active ? 'translate-x-6' : 'translate-x-1'
                                             }`} />
                                         </button>
 
@@ -841,7 +841,7 @@ export default function Portfolio() {
                                             type="button"
                                             onClick={() => deleteScheduledTask(task.id)}
                                             disabled={isScheduledBatchBusy}
-                                            className="p-1.5 text-slate-400 hover:text-red-500 transition-colors shrink-0"
+                                            className="min-h-[36px] shrink-0 rounded-lg px-2 text-slate-400 transition-colors hover:text-red-500"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>

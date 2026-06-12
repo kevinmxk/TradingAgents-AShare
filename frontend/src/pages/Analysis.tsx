@@ -86,8 +86,8 @@ export default function Analysis() {
 
     return (
         <div className="space-y-4">
-            <div className="grid grid-cols-[340px_minmax(0,1fr)] gap-4 min-h-[calc(100vh-5rem)]">
-                <aside className="h-[calc(100vh-5rem)] sticky top-0 flex flex-col gap-4">
+            <div className="grid min-h-[calc(100vh-5rem)] grid-cols-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+                <aside className="flex h-[70vh] flex-col gap-4 lg:sticky lg:top-0 lg:h-[calc(100vh-5rem)]">
                     <div className="min-h-0 flex-1">
                         <ChatCopilotPanel
                             onSymbolDetected={(symbol) => {
@@ -101,7 +101,7 @@ export default function Analysis() {
                 </aside>
 
                 <div className="min-w-0 space-y-4">
-                    <div className="h-[360px]">
+                    <div className="h-[280px] sm:h-[320px] lg:h-[360px]">
                         <KlinePanel
                             symbol={activeSymbol}
                             onSymbolChange={(symbol) => {

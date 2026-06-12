@@ -399,15 +399,15 @@ export default function AgentCollaboration({ onSelectSection, onOpenDebate, sele
     return (
         <section className="card relative overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             {/* 标题栏 */}
-            <div className="flex items-center justify-between mb-2 relative z-10 border-b border-slate-100 dark:border-slate-800 pb-4">
-                <div className="flex items-center gap-3">
+            <div className="relative z-10 mb-2 flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${isAnalyzing ? 'bg-blue-500 animate-pulse shadow-[0_0_12px_#3b82f6]' : 'bg-slate-300'}`} />
-                    <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tighter uppercase">
+                    <h3 className="truncate text-base font-black uppercase tracking-tighter text-slate-900 dark:text-white sm:text-lg">
                         TradingAgents 协同工作流
                     </h3>
                 </div>
                 {isAnalyzing && (
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-between gap-4 sm:justify-end">
                         {currentHorizon && (
                             <span className={`px-3 py-1 rounded-full text-[11px] font-black tracking-widest border animate-in fade-in duration-300 ${
                                 currentHorizon === 'short'
@@ -428,7 +428,7 @@ export default function AgentCollaboration({ onSelectSection, onOpenDebate, sele
             </div>
 
             {/* React Flow 画布 */}
-            <div className="h-[700px] w-full">
+            <div className="h-[520px] w-full overflow-hidden sm:h-[700px]">
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}
