@@ -101,7 +101,7 @@ export default function Analysis() {
                 </aside>
 
                 <div className="min-w-0 space-y-4">
-                    <div className="h-[280px] sm:h-[320px] lg:h-[360px]">
+                    <div className="h-[520px] sm:h-[320px] lg:h-[360px]">
                         <KlinePanel
                             symbol={activeSymbol}
                             onSymbolChange={(symbol) => {
