@@ -324,14 +324,16 @@ def upsert_user_llm_config(
         row.tushare_last_checked_at = tushare_last_checked_at
 
     if clear_api_key:
+        row.api_key = None
         row.api_key_encrypted = None
     elif api_key:
-        row.api_key_encrypted = encrypt_secret(api_key)
+        row.api_key = api_key
 
     if clear_tushare_token:
+        row.tushare_token = None
         row.tushare_token_encrypted = None
     elif tushare_token:
-        row.tushare_token_encrypted = encrypt_secret(tushare_token)
+        row.tushare_token = tushare_token
 
     if clear_wecom_webhook:
         row.wecom_webhook_encrypted = None

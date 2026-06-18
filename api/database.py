@@ -170,6 +170,10 @@ def _ensure_user_schema() -> None:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_capabilities JSON"))
             if "tushare_last_checked_at" not in llm_columns:
                 conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_last_checked_at DATETIME"))
+            if "api_key" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN api_key TEXT"))
+            if "tushare_token" not in llm_columns:
+                conn.execute(text("ALTER TABLE user_llm_configs ADD COLUMN tushare_token TEXT"))
     except Exception as e:
         logger.error("Failed to ensure user schema: %s", e)
 
@@ -395,6 +399,8 @@ class UserLLMConfigDB(Base):
     news_aggregate_max_chars = Column(Integer, nullable=True)
     news_dedupe_enabled = Column(Boolean, nullable=True)
     tushare_enabled = Column(Boolean, nullable=True)
+    api_key = Column(Text, nullable=True)
+    tushare_token = Column(Text, nullable=True)
     tushare_token_encrypted = Column(Text, nullable=True)
     tushare_proxy_url = Column(String(500), nullable=True)
     tushare_timeout = Column(Integer, nullable=True)

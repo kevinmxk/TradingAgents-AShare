@@ -1026,10 +1026,10 @@ def _user_config_overrides(user_id: Optional[str], db: Optional[Session] = None)
             value = getattr(user_cfg, key, None)
             if value is not None:
                 result[key] = value
-        api_key = auth_service.decrypt_secret(user_cfg.api_key_encrypted)
+        api_key = getattr(user_cfg, "api_key", None) or auth_service.decrypt_secret(user_cfg.api_key_encrypted)
         if api_key:
             result["api_key"] = api_key
-        tushare_token = auth_service.decrypt_secret(user_cfg.tushare_token_encrypted)
+        tushare_token = getattr(user_cfg, "tushare_token", None) or auth_service.decrypt_secret(user_cfg.tushare_token_encrypted)
         if tushare_token:
             result["tushare_token"] = tushare_token
         return result
@@ -3556,8 +3556,9 @@ def _mask_tushare_token(token: Optional[str]) -> Optional[str]:
 
 
 def _tushare_token_for_user(user_cfg: Optional[UserLLMConfigDB]) -> Optional[str]:
-    if user_cfg and user_cfg.tushare_token_encrypted:
-        token = auth_service.decrypt_secret(user_cfg.tushare_token_encrypted)
+    token = None
+    if user_cfg:
+        token = getattr(user_cfg, "tushare_token", None) or auth_service.decrypt_secret(user_cfg.tushare_token_encrypted)
         if token:
             return token
     env_token = str(DEFAULT_CONFIG.get("tushare_token") or "").strip()
@@ -3829,7 +3830,7 @@ def _config_response_for_user(user: Optional[UserDB], db: Session) -> UserRuntim
         news_dedupe_enabled=bool(cfg.get("news_dedupe_enabled", True)),
         max_debate_rounds=cfg["max_debate_rounds"],
         max_risk_discuss_rounds=cfg["max_risk_discuss_rounds"],
-        has_api_key=bool(user_cfg and user_cfg.api_key_encrypted),
+        has_api_key=bool(user_cfg and (getattr(user_cfg, "api_key", None) or user_cfg.api_key_encrypted)),
         has_wecom_webhook=bool(webhook_url),
         wecom_webhook_display=_mask_wecom_webhook(webhook_url),
         server_fallback_enabled=bool(cfg.get("server_fallback_enabled", True)),
@@ -4024,7 +4025,7 @@ def update_runtime_config(
     return {
         "message": "用户配置已更新",
         "applied": filtered,
-        "has_api_key": bool(row.api_key_encrypted),
+        "has_api_key": bool(getattr(row, "api_key", None) or row.api_key_encrypted),
         "current": current_cfg,
         "warmup": warmup_payload,
     }
