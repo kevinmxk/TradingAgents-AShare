@@ -20,6 +20,7 @@ fastapi
 uvicorn
 sqlalchemy
 PyJWT
+bcrypt
 cryptography
 json-repair
 markdown

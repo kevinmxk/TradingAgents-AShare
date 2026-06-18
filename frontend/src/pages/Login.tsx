@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle2, Loader2, LockKeyhole, Mail, Radar, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react'
+import { ArrowRight, CheckCircle2, KeyRound, Loader2, LockKeyhole, Mail, Radar, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
@@ -42,12 +42,17 @@ export default function Login() {
     const { setAuth } = useAuthStore()
     const [email, setEmail] = useState('')
     const [code, setCode] = useState('')
-    const [step, setStep] = useState<'email' | 'code'>('email')
+    const [step, setStep] = useState<'email' | 'code' | 'password' | 'password_register'>('email')
+    const [password, setPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
-    const submitLabel = useMemo(() => step === 'email' ? '发送验证码' : '进入研究终端', [step])
+    const submitLabel = useMemo(() => {
+        if (step === 'email') return '发送验证码'
+        if (step === 'password_register') return '创建账户并登录'
+        return '进入研究终端'
+    }, [step])
 
     const handleRequestCode = async (e: FormEvent) => {
         e.preventDefault()
@@ -75,6 +80,38 @@ export default function Login() {
             navigate('/analysis', { replace: true })
         } catch (err) {
             setError(err instanceof Error ? err.message : '登录失败')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handlePasswordLogin = async (e: FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+        setError(null)
+        setMessage(null)
+        try {
+            const res = await api.loginWithPassword(email, password)
+            setAuth(res.access_token, res.user)
+            navigate('/analysis', { replace: true })
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '登录失败')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handlePasswordRegister = async (e: FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+        setError(null)
+        setMessage(null)
+        try {
+            const res = await api.registerWithPassword(email, password)
+            setAuth(res.access_token, res.user)
+            navigate('/analysis', { replace: true })
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '注册失败')
         } finally {
             setLoading(false)
         }
@@ -170,15 +207,28 @@ export default function Login() {
                             </div>
 
                             <div className="mt-6 flex items-center gap-2 rounded-2xl bg-slate-100 p-1 dark:bg-slate-900 dark:ring-1 dark:ring-slate-800">
-                                <div className={`flex-1 rounded-xl px-3 py-2 text-center text-sm transition-colors ${step === 'email' ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => { setStep('email'); setPassword(''); setError(null); setMessage(null) }}
+                                    className={`flex-1 rounded-xl px-3 py-2 text-center text-sm transition-colors ${step === 'email' || step === 'code' ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                >
                                     邮箱验证
-                                </div>
-                                <div className={`flex-1 rounded-xl px-3 py-2 text-center text-sm transition-colors ${step === 'code' ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                                    输入验证码
-                                </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setStep('password'); setError(null); setMessage(null) }}
+                                    className={`flex-1 rounded-xl px-3 py-2 text-center text-sm transition-colors ${step === 'password' || step === 'password_register' ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                >
+                                    密码登录
+                                </button>
                             </div>
 
-                            <form onSubmit={step === 'email' ? handleRequestCode : handleVerify} className="mt-6 space-y-4">
+                            <form onSubmit={
+                                step === 'email' ? handleRequestCode :
+                                step === 'code' ? handleVerify :
+                                step === 'password_register' ? handlePasswordRegister :
+                                handlePasswordLogin
+                            } className="mt-6 space-y-4">
                                 <div>
                                     <label className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">邮箱地址</label>
                                     <div className="relative">
@@ -207,6 +257,26 @@ export default function Login() {
                                                 className="input h-12 w-full rounded-2xl pl-11 tracking-[0.35em]"
                                                 placeholder="输入 6 位验证码"
                                                 maxLength={6}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(step === 'password' || step === 'password_register') && (
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            {step === 'password_register' ? '设置密码' : '密码'}
+                                        </label>
+                                        <div className="relative">
+                                            <KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="password"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="input h-12 w-full rounded-2xl pl-11"
+                                                placeholder={step === 'password_register' ? '至少 6 个字符' : '输入密码'}
+                                                minLength={6}
                                                 required
                                             />
                                         </div>
@@ -243,6 +313,35 @@ export default function Login() {
                                     >
                                         重新获取验证码
                                     </button>
+                                )}
+
+                                {step === 'password' && (
+                                    <div className="text-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setStep('password_register'); setPassword(''); setError(null); setMessage(null) }}
+                                            className="text-sm text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300 underline underline-offset-2"
+                                        >
+                                            没有账户？立即注册
+                                        </button>
+                                    </div>
+                                )}
+
+                                {step === 'password_register' && (
+                                    <div className="space-y-2 text-center">
+                                        <div>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setStep('password'); setPassword(''); setError(null) }}
+                                                className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 underline underline-offset-2"
+                                            >
+                                                已有账户？返回登录
+                                            </button>
+                                        </div>
+                                        <div className="rounded-xl bg-slate-100/90 px-3 py-2 text-xs leading-5 text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+                                            密码使用 bcrypt 加密存储，不会以明文保存。
+                                        </div>
+                                    </div>
                                 )}
                             </form>
 

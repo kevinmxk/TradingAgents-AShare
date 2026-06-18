@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from cryptography.fernet import Fernet, InvalidToken
 import jwt
+import bcrypt
 from jwt.exceptions import PyJWTError as JWTError
 from sqlalchemy.orm import Session
 
@@ -345,3 +346,104 @@ def upsert_user_llm_config(
     db.commit()
     db.refresh(row)
     return row
+
+
+# ─── Password Authentication ────────────────────────────────────────────────
+
+MIN_PASSWORD_LENGTH = 6
+
+
+def hash_password(password: str) -> str:
+    """Hash a password with bcrypt."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify a password against its bcrypt hash."""
+    return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+
+
+def validate_password_strength(password: str) -> None:
+    """Raise ValueError if password does not meet strength requirements."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"密码长度不能少于 {MIN_PASSWORD_LENGTH} 位")
+
+
+def register_with_password(
+    db: Session,
+    email: str,
+    password: str,
+    client_ip: Optional[str] = None,
+) -> UserDB:
+    """Register a new user with email + password. Returns the new user."""
+    email = normalize_email(email)
+    existing = get_user_by_email(db, email)
+    if existing:
+        # If this user already has a password, reject
+        if existing.password_hash:
+            raise ValueError("该邮箱已注册，请直接登录")
+        # Existing user without password (email-code only) — set password
+        existing.password_hash = hash_password(password)
+        existing.updated_at = _utcnow()
+        db.commit()
+        db.refresh(existing)
+        return existing
+
+    validate_password_strength(password)
+    now = _utcnow()
+    user = UserDB(
+        id=str(uuid4()),
+        email=email,
+        password_hash=hash_password(password),
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+        last_login_at=now,
+        last_login_ip=client_ip,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def login_with_password(
+    db: Session,
+    email: str,
+    password: str,
+    client_ip: Optional[str] = None,
+) -> Optional[UserDB]:
+    """Login with email + password. Returns user on success, None on failure."""
+    email = normalize_email(email)
+    user = get_user_by_email(db, email)
+    if not user or not user.password_hash:
+        return None
+    if not user.is_active:
+        return None
+    if not verify_password(password, user.password_hash):
+        return None
+    now = _utcnow()
+    user.last_login_at = now
+    user.last_login_ip = client_ip
+    user.updated_at = now
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def change_password(
+    db: Session,
+    user_id: str,
+    old_password: str,
+    new_password: str,
+) -> None:
+    """Change password for an existing user. Raises ValueError on failure."""
+    user = get_user_by_id(db, user_id)
+    if not user or not user.password_hash:
+        raise ValueError("用户不存在或未设置密码")
+    if not verify_password(old_password, user.password_hash):
+        raise ValueError("当前密码不正确")
+    validate_password_strength(new_password)
+    user.password_hash = hash_password(new_password)
+    user.updated_at = _utcnow()
+    db.commit()

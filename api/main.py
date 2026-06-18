@@ -3839,6 +3839,47 @@ def _config_response_for_user(user: Optional[UserDB], db: Session) -> UserRuntim
     )
 
 
+# ─── Password Authentication ──────────────────────────────────────────────
+
+class PasswordRegisterRequest(BaseModel):
+    email: str
+    password: str
+
+
+class PasswordLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/v1/auth/register", response_model=AuthVerifyCodeResponse)
+def register_with_password(body: PasswordRegisterRequest, request: Request, db: Session = Depends(get_db)):
+    if not re.match(r"^[^@\s]+@[^@\s.]+\.[^@\s.]+$", body.email):
+        raise HTTPException(status_code=400, detail="邮箱格式不正确")
+    try:
+        user = auth_service.register_with_password(
+            db, body.email, body.password, client_ip=_get_real_ip(request)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    access_token = auth_service.create_access_token(user)
+    return AuthVerifyCodeResponse(access_token=access_token, user=user)
+
+
+@app.post("/v1/auth/login", response_model=AuthVerifyCodeResponse)
+def login_with_password(body: PasswordLoginRequest, request: Request, db: Session = Depends(get_db)):
+    if not re.match(r"^[^@\s]+@[^@\s.]+\.[^@\s.]+$", body.email):
+        raise HTTPException(status_code=400, detail="邮箱格式不正确")
+    user = auth_service.login_with_password(
+        db, body.email, body.password, client_ip=_get_real_ip(request)
+    )
+    if not user:
+        raise HTTPException(status_code=401, detail="邮箱或密码不正确")
+    access_token = auth_service.create_access_token(user)
+    return AuthVerifyCodeResponse(access_token=access_token, user=user)
+
+
+# ─── Email Code Authentication (existing) ─────────────────────────────────
+
 @app.post("/v1/auth/request-code")
 def request_login_code(request: AuthRequestCodeRequest):
     email = auth_service.normalize_email(request.email)
