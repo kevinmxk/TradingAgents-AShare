@@ -85,6 +85,7 @@ export default function Settings() {
     const [tushareTimeout, setTushareTimeout] = useState(10)
     const [tushareRateLimit, setTushareRateLimit] = useState(40)
     const [tushareCacheTtl, setTushareCacheTtl] = useState(86400)
+    const [tushareProxyUrl, setTushareProxyUrl] = useState('')
     const [tushareSaving, setTushareSaving] = useState(false)
     const [tushareTesting, setTushareTesting] = useState(false)
     const [tushareProbing, setTushareProbing] = useState(false)
@@ -124,7 +125,7 @@ export default function Settings() {
     useEffect(() => {
         setTushareMessage(null)
         setTushareError(null)
-    }, [tushareEnabled, tushareToken, tushareTimeout, tushareRateLimit, tushareCacheTtl])
+    }, [tushareEnabled, tushareToken, tushareTimeout, tushareRateLimit, tushareCacheTtl, tushareProxyUrl])
 
     useEffect(() => {
         try {
@@ -183,6 +184,7 @@ export default function Settings() {
                 setTushareTimeout(settings.timeout || 10)
                 setTushareRateLimit(settings.rate_limit_per_minute || 40)
                 setTushareCacheTtl(settings.cache_ttl_seconds || 86400)
+                setTushareProxyUrl(settings.proxy_url || '')
             })
             .catch(err => {
                 setTushareError(err instanceof Error ? err.message : '无法加载 Tushare 设置')
@@ -344,6 +346,7 @@ export default function Settings() {
         setTushareTimeout(settings.timeout || 10)
         setTushareRateLimit(settings.rate_limit_per_minute || 40)
         setTushareCacheTtl(settings.cache_ttl_seconds || 86400)
+        setTushareProxyUrl(settings.proxy_url || '')
     }
 
     const handleSaveTushare = async () => {
@@ -357,6 +360,7 @@ export default function Settings() {
                 timeout: tushareTimeout,
                 rate_limit_per_minute: tushareRateLimit,
                 cache_ttl_seconds: tushareCacheTtl,
+                proxy_url: tushareProxyUrl.trim() || null,
             })
             applyTushareSettings(settings)
             setTushareToken('')
@@ -885,6 +889,24 @@ export default function Settings() {
                             </button>
                         )}
                     </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">
+                        Tushare 代理链接 <span className="text-xs text-slate-400 font-normal">（可选）</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={tushareProxyUrl}
+                        onChange={e => setTushareProxyUrl(e.target.value)}
+                        className="input w-full font-mono"
+                        placeholder="留空则使用默认 http://api.tushare.pro"
+                        disabled={configLoading || tushareSaving}
+                        autoComplete="off"
+                    />
+                    <p className="text-xs text-slate-400 mt-1.5">
+                        例：https://tt.dailyfetch.top/ — 设置自定义代理地址来访问 Tushare API
+                    </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

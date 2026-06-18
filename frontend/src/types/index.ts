@@ -663,6 +663,7 @@ export interface TushareSettings {
     capability_cache_ttl_seconds: number
     capabilities: Record<string, TushareCapabilityStatus | string>
     last_checked_at?: string | null
+    proxy_url?: string | null
 }
 
 export interface TushareSettingsUpdate {
@@ -673,6 +674,7 @@ export interface TushareSettingsUpdate {
     rate_limit_per_minute?: number
     cache_ttl_seconds?: number
     capability_cache_ttl_seconds?: number
+    proxy_url?: string | null
 }
 
 export interface TushareTestResponse {
